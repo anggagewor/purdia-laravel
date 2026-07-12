@@ -271,6 +271,74 @@ $appName = $this->config->get('general', 'app.name', 'Purdia');
 
 ---
 
+## Architecture Notes & Anticipations
+
+### Transaksi Lintas Modul (Eventual Consistency vs ACID)
+
+Saat ini events di-dispatch secara sync — ini aman dan predictable. Tapi begitu traffic naik dan kita switch ke `ShouldQueue` (async), ada risk: pembayaran sukses tapi stok gagal dikurangi.
+
+**Antisipasi:**
+- Siapin **Saga pattern / Compensation handler** sebelum pindah ke async
+- Setiap event yang melibatkan state change lintas module harus punya compensating action (rollback)
+- Contoh: `PaymentCompleted` → reduce stock. Kalau reduce stock gagal → dispatch `StockReductionFailed` → trigger refund/reversal
+- Pertimbangkan **Outbox pattern** — simpan event di DB dulu (guaranteed delivery), baru publish ke queue
+
+**Rule:** Jangan switch ke async tanpa compensation mechanism yang jelas.
+
+### Permission Enforcement di Backend
+
+Permission granular (`orders.page.index.button.create`) sangat berguna buat frontend rendering. Tapi frontend BUKAN security layer.
+
+**Rule:** Setiap action yang butuh permission WAJIB dicek di backend juga:
+- Di route level via middleware: `->middleware('permission:orders.action.create')`
+- Atau di Action class: `Gate::authorize('orders.action.create')`
+- Frontend permission hanya untuk UX (hide/show), bukan security
+
+**Convention:**
+- Permission yang berhubungan dengan UI (button visibility) → scope `component`
+- Permission yang berhubungan dengan API action → scope `action` atau `api`
+- Backend HARUS enforce permission scope `action` dan `api`. Scope `component` dan `page` opsional di backend.
+
+### Multi-Tenancy Preparation (Phase 3)
+
+Meskipun multi-tenancy baru di Phase 3, dari sekarang semua tabel business domain (POS, Inventory, CRM, HRM) HARUS sudah include `tenant_id`.
+
+**Rule untuk Phase 2:**
+- Setiap migration tabel bisnis: WAJIB ada `$table->foreignId('tenant_id')->index()`
+- Model base class nanti bisa di-scope otomatis via global scope
+- Tabel yang TIDAK perlu tenant_id: configs (sudah grouped), roles/permissions (bisa shared atau per-tenant nanti)
+- Untuk sekarang, `tenant_id` bisa di-default ke 1 (single tenant mode) sampai Phase 3 ready
+
+**Catatan:** Identity module (users table) belum ada tenant_id — ini intentional. User bisa belong ke multiple tenant. Relasi user-tenant nanti dihandle via pivot table di Phase 3.
+
+### Config & Multi-Tenancy Strategy
+
+Config module yang sekarang (`configs` table) adalah **system-level config** — berlaku untuk seluruh system, bukan per-tenant. Tidak perlu tenant_id.
+
+**Alasan:**
+- Config ini untuk internal app (timezone, tax rate default, token expiry, dll)
+- Tenant config punya behavior yang beda: butuh inheritance/fallback ke system default
+- Campur di satu tabel bikin query ribet dan rawan bugs
+
+**Plan:**
+
+| Layer | Tabel | Scope | Kapan |
+|-------|-------|-------|-------|
+| System config | `configs` | Global, semua tenant sama | ✅ Phase 1 |
+| Tenant config | `tenant_configs` (tenant_id, group, key, value, type) | Per-tenant, override system | Phase 3 |
+
+**Resolution flow (Phase 3 nanti):**
+```
+Request config value
+→ Cek tenant_configs (specific tenant override)
+→ Kalau nggak ada, fallback ke configs (system default)
+→ Kalau nggak ada juga, return default value dari code
+```
+
+**Rule:** Jangan tambahin tenant_id ke tabel `configs`. Kalau butuh per-tenant config, bikin tabel dan mekanisme terpisah.
+
+---
+
 ## Adding a New Module
 
 1. Create folder structure under `src/{ModuleName}/`
@@ -301,3 +369,7 @@ $appName = $this->config->get('general', 'app.name', 'Purdia');
 | 2026-07-12 | Se-native mungkin dengan Laravel | Upgrade-friendly, DDD di struktur bukan melawan framework |
 | 2026-07-12 | Config module with DB storage | Avoid code changes for config. Grouped by module, dot-notation keys, typed values |
 | 2026-07-12 | Global config group = "general" | Shared/non-module configs pakai group "general" |
+| 2026-07-12 | Sync events dulu, async nanti + Saga | Jangan async tanpa compensation handler. Outbox pattern dipertimbangkan |
+| 2026-07-12 | Permission enforce di backend WAJIB | Frontend permission cuma UX, backend harus enforce scope action/api |
+| 2026-07-12 | tenant_id di semua tabel bisnis Phase 2 | Preparation multi-tenancy. Default 1 dulu, Phase 3 baru activate |
+| 2026-07-12 | Config table tanpa tenant_id | System-level config. Tenant config nanti tabel terpisah (tenant_configs) dengan fallback mechanism |
