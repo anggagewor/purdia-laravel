@@ -434,6 +434,8 @@ Request config value
 5. Create migrations in `Infrastructure/Database/Migrations/`
 6. Run `composer dump-autoload` and `php artisan migrate`
 
+**Coding rules & conventions:** See `.kiro/steering/coding-rules.md` — auto-applied on every interaction.
+
 ---
 
 ## Decision Log
