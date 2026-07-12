@@ -340,6 +340,7 @@ Single lookup: `GET /api/lookups/gender`
 - [x] Config module (DB-driven config per module, grouped, dot notation)
 - [x] Reference module (countries, currencies, units, lookups — seeded data)
 - [x] Storage module (file management, access control, storage rules)
+- [x] Tenant module (multi-tenancy, branches, context, resolver chain)
 
 ### Storage ✅
 
@@ -385,6 +386,59 @@ extension_pattern: "pdf" → disk: "local", path_prefix: "documents/"
 - `DELETE /api/files/{id}/access` — Revoke access
 - `GET /api/files/entity/{type}/{id}` — Get files attached to an entity
 
+### Tenant ✅
+
+Multi-tenancy foundation. Tenant = perusahaan/bisnis. Branch = cabang/toko/gudang.
+
+**Design:**
+- 1 Tenant = 1 perusahaan. Branch = toko/outlet/gudang/kantor/factory
+- User many-to-many Tenant (user bisa handle banyak perusahaan)
+- Role per-tenant (user bisa punya role beda di tenant berbeda)
+- Branch access via pivot (kosong = akses semua, ada isi = restrict)
+- Settings inheritance: Branch → Tenant → System default
+- Resolver chain: Header → Subdomain → JWT (extensible)
+- No `owner_id` di tenant — owner ditentukan lewat role
+
+**Models:** Tenant, Branch, TenantUser, BranchUser
+
+**Tables:** tenants, branches, tenant_users, branch_users
+
+**Enums:** BranchType (store, warehouse, office, factory, virtual)
+
+**Context:** `TenantContext` — singleton, single source of truth
+- `TenantContext::tenantId()` — current tenant
+- `TenantContext::branchIds()` — accessible branches
+- `TenantContext::setting('key', default)` — with inheritance
+
+**Shared Interface:** `TenantContextInterface` (for module isolation)
+
+**Traits (Shared):**
+- `BelongsToTenant` — auto-scope + auto-set tenant_id
+- `HasAudit` — auto-set created_by, updated_by, deleted_by
+
+**Middleware:** `tenant` / `ResolveTenant` — resolves tenant dari request
+
+**Endpoints:**
+- `GET /api/tenants` — List user's tenants
+- `POST /api/tenants` — Create tenant (user jadi owner)
+- `GET /api/tenants/{id}` — Get tenant detail
+- `GET /api/branches` — List branches (requires X-Tenant-Id)
+- `POST /api/branches` — Create branch
+- `GET /api/branches/{id}` — Get branch detail
+
+**Architecture Principles:**
+```
+Core tidak boleh tahu module.
+Module tidak boleh saling tahu.
+Komunikasi HANYA lewat contracts, events, atau context.
+
+Module bisnis cuma depend ke:
+- Purdia\Shared\* (contracts, DTOs, events)
+- TenantContextInterface (tenant/branch)
+- AuthorizationGateway (permissions)
+- ConfigGateway (settings)
+```
+
 ### Phase 2 — Core Business (Planned)
 - [ ] POS module
 - [ ] Inventory module
@@ -392,7 +446,7 @@ extension_pattern: "pdf" → disk: "local", path_prefix: "documents/"
 - [ ] HRM module
 
 ### Phase 3 — Scale
-- [ ] Multi-tenancy
+- [ ] Multi-tenancy activation (scope auto-apply, tenant switching UI)
 - [ ] Audit logging
 - [ ] API versioning (V2)
 - [ ] Queue-based event processing
@@ -429,15 +483,42 @@ Permission granular (`orders.page.index.button.create`) sangat berguna buat fron
 
 ### Multi-Tenancy Preparation (Phase 3)
 
-Meskipun multi-tenancy baru di Phase 3, dari sekarang semua tabel business domain (POS, Inventory, CRM, HRM) HARUS sudah include `tenant_id`.
+~~Meskipun multi-tenancy baru di Phase 3~~ — **Tenant module sudah di-implement di Phase 1.**
+
+**Current state:**
+- Tenant model, Branch model, TenantUser, BranchUser — DONE
+- TenantContext + Resolver chain — DONE
+- BelongsToTenant trait — DONE, ready to use
+- HasAudit trait — DONE
+- ResolveTenant middleware — DONE
+
+**What's left for Phase 3 (activation):**
+- Auto-apply BelongsToTenant di semua module bisnis
+- Tenant switching UI flow
+- Tenant billing/plan management
+- tenant_configs table (per-tenant config override)
 
 **Rule untuk Phase 2:**
 - Setiap migration tabel bisnis: WAJIB ada `$table->foreignId('tenant_id')->index()`
-- Model base class nanti bisa di-scope otomatis via global scope
-- Tabel yang TIDAK perlu tenant_id: configs (sudah grouped), roles/permissions (bisa shared atau per-tenant nanti)
-- Untuk sekarang, `tenant_id` bisa di-default ke 1 (single tenant mode) sampai Phase 3 ready
+- Model bisnis: WAJIB `use BelongsToTenant, HasAudit, SoftDeletes;`
+- Branch-scoped data: tambah `$table->foreignId('branch_id')->index()`
+- Routes bisnis: tambah `->middleware('tenant')` di group
 
-**Catatan:** Identity module (users table) belum ada tenant_id — ini intentional. User bisa belong ke multiple tenant. Relasi user-tenant nanti dihandle via pivot table di Phase 3.
+### Module Independence Principle
+
+```
+Core (Foundation)
+├── Shared, Identity, Authorization, Tenant, Config, Storage, Reference, Audit
+
+Modules (Business)
+├── POS, Inventory, CRM, HRM, Finance, Project
+```
+
+**Rules:**
+- Core TIDAK BOLEH tau module bisnis
+- Module bisnis TIDAK BOLEH saling import
+- Komunikasi HANYA lewat: contracts, events, atau TenantContext
+- Module bisnis depend ke Shared contracts only
 
 ### Config & Multi-Tenancy Strategy
 
@@ -509,3 +590,16 @@ Request config value
 | 2026-07-12 | Storage module — metadata only di DB | File fisik di filesystem (disk), DB cuma simpan metadata + access control |
 | 2026-07-12 | Storage rules buat auto-routing | File otomatis masuk disk/path yang tepat berdasarkan mime type atau extension |
 | 2026-07-12 | File access control: public/private/restricted | Restricted pake access list per user/role dengan level read_only/read_write/full_control |
+| 2026-07-12 | Tenant = Perusahaan, Branch = Cabang/Toko | 1 tenant = 1 bisnis. Cabang/toko/gudang = branch di dalam tenant |
+| 2026-07-12 | No owner_id di tenant | Owner = role di tenant_users. Lebih flexible kalau ownership berubah |
+| 2026-07-12 | User-Tenant many-to-many | User bisa handle banyak perusahaan (owner multi-bisnis, akuntan, dll) |
+| 2026-07-12 | Branch access via separate pivot | branch_users terpisah dari tenant_users. 1 user bisa akses banyak branch tanpa duplicate role |
+| 2026-07-12 | TenantContext sebagai single source of truth | Module lain cuma akses lewat TenantContextInterface, nggak import Tenant module langsung |
+| 2026-07-12 | Resolver chain (Header → Subdomain → JWT) | Extensible, nggak locked ke 1 mechanism |
+| 2026-07-12 | Settings inheritance: Branch → Tenant → System | Fallback chain buat flexibility tanpa duplikasi |
+| 2026-07-12 | HasAudit trait (created_by, updated_by, deleted_by) | Auto via model events. Developer nggak perlu mikir |
+| 2026-07-12 | BelongsToTenant trait (auto scope + auto set) | Global scope otomatis. Semua query tenant-safe |
+| 2026-07-12 | Branch type enum + code unique per tenant | Support store/warehouse/office/factory/virtual. Code buat invoice numbering |
+| 2026-07-12 | parent_branch_id untuk hierarchy | Murah, optional, ready kalau butuh regional grouping |
+| 2026-07-12 | Soft delete semua entity bisnis | ERP jarang benar-benar delete data |
+| 2026-07-12 | UI: "Company" bukan "Tenant" | User-friendly. Code tetap pake Tenant |
