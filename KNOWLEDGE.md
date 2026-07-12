@@ -245,6 +245,88 @@ $taxRate = $this->config->get('pos', 'tax_rate', 11);
 $appName = $this->config->get('general', 'app.name', 'Purdia');
 ```
 
+### Reference ✅
+
+Master/reference data — countries, currencies. Read-only API, seeded from JSON.
+
+**Models:** Country, Currency
+
+**Tables:** countries, currencies
+
+**Data:** 143 countries with their currencies, seeded via `CountrySeeder`
+
+**Endpoints:**
+- `GET /api/references/countries` — List countries (filter: region, search, active_only)
+- `GET /api/references/countries/{id}` — Get country with currency
+- `GET /api/references/currencies` — List currencies (filter: search, active_only)
+- `GET /api/references/currencies/{id}` — Get single currency
+- `GET /api/references/units` — List all unit categories with units
+- `GET /api/references/units/convert?from=kg&to=g&value=5` — Convert between units
+- `GET /api/references/units/{category-slug}` — Get units for a category
+
+**Seeded Data:**
+- 143 countries with currencies
+- 7 unit categories: Weight, Length, Volume, Area, Temperature, Time, Piece
+- 46 units with 104 conversion pairs (bidirectional)
+
+**Unit Categories:**
+| Category | Base Unit | Units |
+|----------|-----------|-------|
+| Weight | g | mg, g, kg, t, oz, lb |
+| Length | m | mm, cm, m, km, in, ft, yd, mi |
+| Volume | l | ml, l, m³, gal, qt, pt, cup, fl oz |
+| Area | m² | mm², cm², m², ha, km², ft², ac |
+| Temperature | °C | °C, °F, K (formula-based, no factor) |
+| Time | s | ms, s, min, h, d, wk, mo, yr |
+| Piece | pcs | pcs, dz, gr, pr, box, pack |
+
+**Seeding:**
+```bash
+php artisan db:seed
+```
+
+**Lookup System:**
+
+Unified endpoint buat ambil banyak reference data dalam 1 request:
+
+```
+GET /api/lookups?types=country,currency,gender,timezone
+```
+
+Response:
+```json
+{
+  "data": {
+    "country": [...],
+    "currency": [...],
+    "gender": [...],
+    "timezone": [...]
+  }
+}
+```
+
+Available lookup types:
+- `country` — dari tabel countries
+- `currency` — dari tabel currencies
+- `timezone` — dari tabel timezones
+- `language` — dari tabel languages
+- `tax-category` — dari tabel tax_categories
+- `unit` — dari tabel unit_categories + units
+- `gender` — dari lookup_items
+- `religion` — dari lookup_items
+- `marital-status` — dari lookup_items
+- `blood-type` — dari lookup_items
+- `education` — dari lookup_items
+- `employment-status` — dari lookup_items
+
+Single lookup: `GET /api/lookups/gender`
+
+**Design:**
+- Data yang punya field complex (timezone, language, tax) → tabel sendiri
+- Data yang cuma id + name (gender, religion, dll) → generic `lookup_types` + `lookup_items`
+- Semua bisa diakses via unified `/api/lookups` endpoint
+- Extensible: tambahin lookup type baru cuma perlu insert data, nggak perlu code baru
+
 ---
 
 ## Roadmap
@@ -256,6 +338,7 @@ $appName = $this->config->get('general', 'app.name', 'Purdia');
 - [x] Identity module (auth: register, login, logout, refresh)
 - [x] Authorization module (RBAC: roles, permissions, middleware, full CRUD)
 - [x] Config module (DB-driven config per module, grouped, dot notation)
+- [x] Reference module (countries, currencies — seeded data)
 
 ### Phase 2 — Core Business (Planned)
 - [ ] POS module
@@ -373,3 +456,6 @@ Request config value
 | 2026-07-12 | Permission enforce di backend WAJIB | Frontend permission cuma UX, backend harus enforce scope action/api |
 | 2026-07-12 | tenant_id di semua tabel bisnis Phase 2 | Preparation multi-tenancy. Default 1 dulu, Phase 3 baru activate |
 | 2026-07-12 | Config table tanpa tenant_id | System-level config. Tenant config nanti tabel terpisah (tenant_configs) dengan fallback mechanism |
+| 2026-07-12 | Reference module untuk master data | Countries, currencies — seeded, read-only. Foundation buat module bisnis (POS, Inventory) |
+| 2026-07-12 | Generic lookup system | Data simple (gender, religion, dll) pake lookup_types + lookup_items. Extensible tanpa code change |
+| 2026-07-12 | Unified /api/lookups endpoint | Single request buat multiple reference data. Hemat API call buat form filling |

@@ -1,0 +1,79 @@
+[
+  {
+    "name": "Gender",
+    "slug": "gender",
+    "description": "Gender identity options",
+    "items": [
+      {"name": "Male", "slug": "male", "sort_order": 1},
+      {"name": "Female", "slug": "female", "sort_order": 2},
+      {"name": "Other", "slug": "other", "sort_order": 3}
+    ]
+  },
+  {
+    "name": "Religion",
+    "slug": "religion",
+    "description": "Religious affiliations",
+    "items": [
+      {"name": "Islam", "slug": "islam", "sort_order": 1},
+      {"name": "Christianity", "slug": "christianity", "sort_order": 2},
+      {"name": "Catholicism", "slug": "catholicism", "sort_order": 3},
+      {"name": "Hinduism", "slug": "hinduism", "sort_order": 4},
+      {"name": "Buddhism", "slug": "buddhism", "sort_order": 5},
+      {"name": "Confucianism", "slug": "confucianism", "sort_order": 6},
+      {"name": "Other", "slug": "other", "sort_order": 7}
+    ]
+  },
+  {
+    "name": "Marital Status",
+    "slug": "marital-status",
+    "description": "Marital status options",
+    "items": [
+      {"name": "Single", "slug": "single", "sort_order": 1},
+      {"name": "Married", "slug": "married", "sort_order": 2},
+      {"name": "Divorced", "slug": "divorced", "sort_order": 3},
+      {"name": "Widowed", "slug": "widowed", "sort_order": 4}
+    ]
+  },
+  {
+    "name": "Blood Type",
+    "slug": "blood-type",
+    "description": "Blood type classification",
+    "items": [
+      {"name": "A+", "slug": "a-positive", "sort_order": 1},
+      {"name": "A-", "slug": "a-negative", "sort_order": 2},
+      {"name": "B+", "slug": "b-positive", "sort_order": 3},
+      {"name": "B-", "slug": "b-negative", "sort_order": 4},
+      {"name": "AB+", "slug": "ab-positive", "sort_order": 5},
+      {"name": "AB-", "slug": "ab-negative", "sort_order": 6},
+      {"name": "O+", "slug": "o-positive", "sort_order": 7},
+      {"name": "O-", "slug": "o-negative", "sort_order": 8}
+    ]
+  },
+  {
+    "name": "Education",
+    "slug": "education",
+    "description": "Education level",
+    "items": [
+      {"name": "Elementary School (SD)", "slug": "sd", "sort_order": 1},
+      {"name": "Junior High School (SMP)", "slug": "smp", "sort_order": 2},
+      {"name": "Senior High School (SMA/SMK)", "slug": "sma", "sort_order": 3},
+      {"name": "Diploma (D1-D3)", "slug": "diploma", "sort_order": 4},
+      {"name": "Bachelor's Degree (S1)", "slug": "s1", "sort_order": 5},
+      {"name": "Master's Degree (S2)", "slug": "s2", "sort_order": 6},
+      {"name": "Doctoral Degree (S3)", "slug": "s3", "sort_order": 7}
+    ]
+  },
+  {
+    "name": "Employment Status",
+    "slug": "employment-status",
+    "description": "Employment type/status",
+    "items": [
+      {"name": "Full-time", "slug": "full-time", "sort_order": 1},
+      {"name": "Part-time", "slug": "part-time", "sort_order": 2},
+      {"name": "Contract", "slug": "contract", "sort_order": 3},
+      {"name": "Internship", "slug": "internship", "sort_order": 4},
+      {"name": "Freelance", "slug": "freelance", "sort_order": 5},
+      {"name": "Probation", "slug": "probation", "sort_order": 6}
+    ]
+  }
+]

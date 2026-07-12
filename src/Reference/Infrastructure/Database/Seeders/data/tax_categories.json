@@ -1,0 +1,9 @@
+[
+  {"name":"PPN (Pajak Pertambahan Nilai)","slug":"ppn","rate":11,"description":"Standard VAT rate Indonesia"},
+  {"name":"PPN Reduced","slug":"ppn-reduced","rate":0,"description":"PPN 0% for exports and certain goods"},
+  {"name":"PPh 21","slug":"pph-21","rate":5,"description":"Employee income tax (lowest bracket)"},
+  {"name":"PPh 23","slug":"pph-23","rate":2,"description":"Withholding tax on services"},
+  {"name":"Tax Exempt","slug":"tax-exempt","rate":0,"description":"No tax applied"},
+  {"name":"Luxury Goods Tax (PPnBM)","slug":"ppnbm","rate":20,"description":"Luxury goods sales tax"},
+  {"name":"Service Charge","slug":"service-charge","rate":10,"description":"Service charge for hospitality"}
+]

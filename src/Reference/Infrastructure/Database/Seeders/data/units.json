@@ -1,0 +1,155 @@
+[
+  {
+    "name": "Weight",
+    "slug": "weight",
+    "units": [
+      {"name": "Milligram", "symbol": "mg", "is_base": false},
+      {"name": "Gram", "symbol": "g", "is_base": true},
+      {"name": "Kilogram", "symbol": "kg", "is_base": false},
+      {"name": "Ton", "symbol": "t", "is_base": false},
+      {"name": "Ounce", "symbol": "oz", "is_base": false},
+      {"name": "Pound", "symbol": "lb", "is_base": false}
+    ],
+    "conversions": [
+      {"from": "kg", "to": "g", "factor": 1000},
+      {"from": "kg", "to": "mg", "factor": 1000000},
+      {"from": "t", "to": "kg", "factor": 1000},
+      {"from": "g", "to": "mg", "factor": 1000},
+      {"from": "lb", "to": "g", "factor": 453.592},
+      {"from": "oz", "to": "g", "factor": 28.3495},
+      {"from": "lb", "to": "oz", "factor": 16},
+      {"from": "kg", "to": "lb", "factor": 2.20462},
+      {"from": "t", "to": "g", "factor": 1000000}
+    ]
+  },
+  {
+    "name": "Length",
+    "slug": "length",
+    "units": [
+      {"name": "Millimeter", "symbol": "mm", "is_base": false},
+      {"name": "Centimeter", "symbol": "cm", "is_base": false},
+      {"name": "Meter", "symbol": "m", "is_base": true},
+      {"name": "Kilometer", "symbol": "km", "is_base": false},
+      {"name": "Inch", "symbol": "in", "is_base": false},
+      {"name": "Foot", "symbol": "ft", "is_base": false},
+      {"name": "Yard", "symbol": "yd", "is_base": false},
+      {"name": "Mile", "symbol": "mi", "is_base": false}
+    ],
+    "conversions": [
+      {"from": "km", "to": "m", "factor": 1000},
+      {"from": "m", "to": "cm", "factor": 100},
+      {"from": "m", "to": "mm", "factor": 1000},
+      {"from": "cm", "to": "mm", "factor": 10},
+      {"from": "km", "to": "cm", "factor": 100000},
+      {"from": "mi", "to": "km", "factor": 1.60934},
+      {"from": "yd", "to": "m", "factor": 0.9144},
+      {"from": "ft", "to": "m", "factor": 0.3048},
+      {"from": "in", "to": "cm", "factor": 2.54},
+      {"from": "ft", "to": "in", "factor": 12},
+      {"from": "yd", "to": "ft", "factor": 3},
+      {"from": "mi", "to": "ft", "factor": 5280}
+    ]
+  },
+  {
+    "name": "Volume",
+    "slug": "volume",
+    "units": [
+      {"name": "Milliliter", "symbol": "ml", "is_base": false},
+      {"name": "Liter", "symbol": "l", "is_base": true},
+      {"name": "Cubic Meter", "symbol": "m³", "is_base": false},
+      {"name": "Gallon (US)", "symbol": "gal", "is_base": false},
+      {"name": "Quart (US)", "symbol": "qt", "is_base": false},
+      {"name": "Pint (US)", "symbol": "pt", "is_base": false},
+      {"name": "Cup (US)", "symbol": "cup", "is_base": false},
+      {"name": "Fluid Ounce (US)", "symbol": "fl oz", "is_base": false}
+    ],
+    "conversions": [
+      {"from": "l", "to": "ml", "factor": 1000},
+      {"from": "m³", "to": "l", "factor": 1000},
+      {"from": "gal", "to": "l", "factor": 3.78541},
+      {"from": "qt", "to": "l", "factor": 0.946353},
+      {"from": "pt", "to": "ml", "factor": 473.176},
+      {"from": "cup", "to": "ml", "factor": 236.588},
+      {"from": "fl oz", "to": "ml", "factor": 29.5735},
+      {"from": "gal", "to": "qt", "factor": 4},
+      {"from": "qt", "to": "pt", "factor": 2},
+      {"from": "pt", "to": "cup", "factor": 2},
+      {"from": "cup", "to": "fl oz", "factor": 8}
+    ]
+  },
+  {
+    "name": "Area",
+    "slug": "area",
+    "units": [
+      {"name": "Square Millimeter", "symbol": "mm²", "is_base": false},
+      {"name": "Square Centimeter", "symbol": "cm²", "is_base": false},
+      {"name": "Square Meter", "symbol": "m²", "is_base": true},
+      {"name": "Hectare", "symbol": "ha", "is_base": false},
+      {"name": "Square Kilometer", "symbol": "km²", "is_base": false},
+      {"name": "Square Foot", "symbol": "ft²", "is_base": false},
+      {"name": "Acre", "symbol": "ac", "is_base": false}
+    ],
+    "conversions": [
+      {"from": "km²", "to": "m²", "factor": 1000000},
+      {"from": "ha", "to": "m²", "factor": 10000},
+      {"from": "m²", "to": "cm²", "factor": 10000},
+      {"from": "cm²", "to": "mm²", "factor": 100},
+      {"from": "km²", "to": "ha", "factor": 100},
+      {"from": "ac", "to": "m²", "factor": 4046.86},
+      {"from": "ft²", "to": "m²", "factor": 0.092903}
+    ]
+  },
+  {
+    "name": "Temperature",
+    "slug": "temperature",
+    "units": [
+      {"name": "Celsius", "symbol": "°C", "is_base": true},
+      {"name": "Fahrenheit", "symbol": "°F", "is_base": false},
+      {"name": "Kelvin", "symbol": "K", "is_base": false}
+    ],
+    "conversions": []
+  },
+  {
+    "name": "Time",
+    "slug": "time",
+    "units": [
+      {"name": "Millisecond", "symbol": "ms", "is_base": false},
+      {"name": "Second", "symbol": "s", "is_base": true},
+      {"name": "Minute", "symbol": "min", "is_base": false},
+      {"name": "Hour", "symbol": "h", "is_base": false},
+      {"name": "Day", "symbol": "d", "is_base": false},
+      {"name": "Week", "symbol": "wk", "is_base": false},
+      {"name": "Month", "symbol": "mo", "is_base": false},
+      {"name": "Year", "symbol": "yr", "is_base": false}
+    ],
+    "conversions": [
+      {"from": "s", "to": "ms", "factor": 1000},
+      {"from": "min", "to": "s", "factor": 60},
+      {"from": "h", "to": "min", "factor": 60},
+      {"from": "d", "to": "h", "factor": 24},
+      {"from": "wk", "to": "d", "factor": 7},
+      {"from": "mo", "to": "d", "factor": 30},
+      {"from": "yr", "to": "d", "factor": 365},
+      {"from": "h", "to": "s", "factor": 3600},
+      {"from": "d", "to": "s", "factor": 86400}
+    ]
+  },
+  {
+    "name": "Piece",
+    "slug": "piece",
+    "units": [
+      {"name": "Piece", "symbol": "pcs", "is_base": true},
+      {"name": "Dozen", "symbol": "dz", "is_base": false},
+      {"name": "Gross", "symbol": "gr", "is_base": false},
+      {"name": "Pair", "symbol": "pr", "is_base": false},
+      {"name": "Box", "symbol": "box", "is_base": false},
+      {"name": "Pack", "symbol": "pack", "is_base": false}
+    ],
+    "conversions": [
+      {"from": "dz", "to": "pcs", "factor": 12},
+      {"from": "gr", "to": "pcs", "factor": 144},
+      {"from": "pr", "to": "pcs", "factor": 2},
+      {"from": "gr", "to": "dz", "factor": 12}
+    ]
+  }
+]
