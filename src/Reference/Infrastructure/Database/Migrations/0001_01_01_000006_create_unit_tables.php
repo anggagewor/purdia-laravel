@@ -17,7 +17,7 @@ return new class extends Migration
 
         Schema::create('units', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('category_id')->constrained('unit_categories')->cascadeOnDelete();
+            $table->unsignedBigInteger('category_id')->index();
             $table->string('name');
             $table->string('symbol', 20);
             $table->boolean('is_base')->default(false);
@@ -28,8 +28,8 @@ return new class extends Migration
 
         Schema::create('unit_conversions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('from_unit_id')->constrained('units')->cascadeOnDelete();
-            $table->foreignId('to_unit_id')->constrained('units')->cascadeOnDelete();
+            $table->unsignedBigInteger('from_unit_id')->index();
+            $table->unsignedBigInteger('to_unit_id')->index();
             $table->decimal('factor', 20, 10);
             $table->timestamps();
 

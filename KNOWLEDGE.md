@@ -429,3 +429,4 @@ default value dari code
 | 2026-07-12 | Branch type enum + code + hierarchy | store/warehouse/office/factory/virtual. parent_branch_id. |
 | 2026-07-12 | Permission enforce backend WAJIB | Frontend permission cuma UX |
 | 2026-07-12 | UI: "Company" bukan "Tenant" | User-friendly naming |
+| 2026-07-12 | No DB foreign key constraints | Handle di application layer. Lebih gampang debug/fix data. Soft delete + cascade konflik. |

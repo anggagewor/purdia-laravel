@@ -24,7 +24,7 @@ return new class extends Migration
 
         Schema::create('currencies', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('country_id')->constrained('countries')->cascadeOnDelete();
+            $table->unsignedBigInteger('country_id')->index();
             $table->string('name');
             $table->string('code', 3);
             $table->string('symbol', 10);

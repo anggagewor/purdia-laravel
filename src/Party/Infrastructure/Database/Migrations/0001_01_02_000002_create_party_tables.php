@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('parties', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
+            $table->unsignedBigInteger('tenant_id')->index();
             $table->string('type');
             $table->string('display_name');
             $table->string('code')->nullable();
@@ -27,7 +27,7 @@ return new class extends Migration
 
         Schema::create('persons', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('party_id')->constrained('parties')->cascadeOnDelete();
+            $table->unsignedBigInteger('party_id')->index();
             $table->string('first_name');
             $table->string('last_name')->nullable();
             $table->date('birth_date')->nullable();
@@ -41,7 +41,7 @@ return new class extends Migration
 
         Schema::create('organizations', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('party_id')->constrained('parties')->cascadeOnDelete();
+            $table->unsignedBigInteger('party_id')->index();
             $table->string('legal_name');
             $table->string('tax_number')->nullable();
             $table->string('npwp')->nullable();
@@ -53,19 +53,17 @@ return new class extends Migration
 
         Schema::create('party_contacts', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('party_id')->constrained('parties')->cascadeOnDelete();
+            $table->unsignedBigInteger('party_id')->index();
             $table->string('type');
             $table->string('label')->nullable();
             $table->string('value');
             $table->boolean('is_primary')->default(false);
             $table->timestamps();
-
-            $table->index(['party_id', 'type']);
         });
 
         Schema::create('party_addresses', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('party_id')->constrained('parties')->cascadeOnDelete();
+            $table->unsignedBigInteger('party_id')->index();
             $table->string('type');
             $table->string('label')->nullable();
             $table->string('line_1');
@@ -76,13 +74,11 @@ return new class extends Migration
             $table->string('country_code', 2)->nullable();
             $table->boolean('is_primary')->default(false);
             $table->timestamps();
-
-            $table->index(['party_id', 'type']);
         });
 
         Schema::create('party_roles', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('party_id')->constrained('parties')->cascadeOnDelete();
+            $table->unsignedBigInteger('party_id')->index();
             $table->string('role');
             $table->boolean('is_active')->default(true);
             $table->timestamps();
@@ -93,15 +89,12 @@ return new class extends Migration
 
         Schema::create('party_relationships', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('party_a_id')->constrained('parties')->cascadeOnDelete();
-            $table->foreignId('party_b_id')->constrained('parties')->cascadeOnDelete();
+            $table->unsignedBigInteger('party_a_id')->index();
+            $table->unsignedBigInteger('party_b_id')->index();
             $table->string('type');
             $table->string('description')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
-
-            $table->index(['party_a_id', 'type']);
-            $table->index(['party_b_id', 'type']);
         });
     }
 

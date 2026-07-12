@@ -31,13 +31,13 @@ return new class extends Migration
 
         Schema::create('file_accesses', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('file_id')->constrained('files')->cascadeOnDelete();
+            $table->unsignedBigInteger('file_id')->index();
             $table->string('accessor_type');
             $table->string('accessor_id');
             $table->string('access_level')->default('read_only');
             $table->timestamps();
 
-            $table->unique(['file_id', 'accessor_type', 'accessor_id']);
+            $table->unique(['file_id', 'accessor_type', 'accessor_id'], 'file_access_unique');
             $table->index(['accessor_type', 'accessor_id']);
         });
 

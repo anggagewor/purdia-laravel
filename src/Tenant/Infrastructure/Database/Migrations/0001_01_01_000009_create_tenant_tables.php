@@ -25,8 +25,8 @@ return new class extends Migration
 
         Schema::create('branches', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('parent_branch_id')->nullable()->constrained('branches')->nullOnDelete();
+            $table->unsignedBigInteger('tenant_id')->index();
+            $table->unsignedBigInteger('parent_branch_id')->nullable()->index();
             $table->string('name');
             $table->string('code', 20);
             $table->string('type')->default('store');
@@ -43,9 +43,9 @@ return new class extends Migration
 
         Schema::create('tenant_users', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
-            $table->foreignId('role_id')->constrained('roles')->cascadeOnDelete();
+            $table->unsignedBigInteger('tenant_id')->index();
+            $table->unsignedBigInteger('user_id')->index();
+            $table->unsignedBigInteger('role_id')->index();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 
@@ -54,8 +54,8 @@ return new class extends Migration
 
         Schema::create('branch_users', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_user_id')->constrained('tenant_users')->cascadeOnDelete();
-            $table->foreignId('branch_id')->constrained('branches')->cascadeOnDelete();
+            $table->unsignedBigInteger('tenant_user_id')->index();
+            $table->unsignedBigInteger('branch_id')->index();
             $table->timestamps();
 
             $table->unique(['tenant_user_id', 'branch_id']);

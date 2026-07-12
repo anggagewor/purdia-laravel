@@ -10,8 +10,8 @@ return new class extends Migration
     {
         Schema::create('sequences', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('branch_id')->nullable()->constrained('branches')->nullOnDelete();
+            $table->unsignedBigInteger('tenant_id')->index();
+            $table->unsignedBigInteger('branch_id')->nullable()->index();
             $table->string('type', 50);
             $table->string('prefix', 20);
             $table->string('format');

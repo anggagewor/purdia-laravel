@@ -26,15 +26,15 @@ return new class extends Migration
 
         Schema::create('role_permission', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('role_id')->constrained('roles')->cascadeOnDelete();
-            $table->foreignId('permission_id')->constrained('permissions')->cascadeOnDelete();
+            $table->unsignedBigInteger('role_id')->index();
+            $table->unsignedBigInteger('permission_id')->index();
             $table->unique(['role_id', 'permission_id']);
         });
 
         Schema::create('user_role', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
-            $table->foreignId('role_id')->constrained('roles')->cascadeOnDelete();
+            $table->unsignedBigInteger('user_id')->index();
+            $table->unsignedBigInteger('role_id')->index();
             $table->unique(['user_id', 'role_id']);
         });
     }

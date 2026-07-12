@@ -228,10 +228,18 @@ enum UserStatus: string
 
 ### 3.8 Migrations
 - JANGAN pake `enum()` column type
+- JANGAN pake `->constrained()` atau `->cascadeOnDelete()` — NO DB-level foreign key constraints
+- Relationship integrity di-handle di application layer (model/event), bukan di DB
+- Gunakan `$table->unsignedBigInteger('xxx_id')->index()` untuk FK columns
 - Boolean columns: `$table->boolean('is_active')->default(true)`
-- Selalu `cascadeOnDelete()` pada foreign keys kecuali ada alasan kuat
 - Naming: `{timestamp}_create_{table}_table.php` atau `{timestamp}_add_{column}_to_{table}_table.php`
-- Phase 2+ tabel bisnis: WAJIB ada `$table->foreignId('tenant_id')->index()`
+- Phase 2+ tabel bisnis: WAJIB ada `$table->unsignedBigInteger('tenant_id')->index()`
+
+**Alasan no DB FK constraints:**
+- Lebih gampang delete/fix data yang salah tanpa harus trace cascade
+- Soft delete + DB cascade sering konflik
+- Application layer lebih explicit dan auditable
+- Migration rollback lebih predictable
 
 ---
 
@@ -345,6 +353,7 @@ tests/
 - ❌ Business logic di Model
 - ❌ `$guarded = []` di Model
 - ❌ DB `enum` type di migration
+- ❌ DB foreign key constraints (`->constrained()`, `->cascadeOnDelete()`) di migration
 - ❌ Logic di DTO
 - ❌ Hard-coded config values (pake Config module)
 - ❌ Bypass permission di backend (frontend-only permission)

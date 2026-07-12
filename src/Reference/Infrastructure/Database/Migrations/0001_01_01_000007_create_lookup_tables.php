@@ -47,7 +47,7 @@ return new class extends Migration
 
         Schema::create('lookup_items', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('type_id')->constrained('lookup_types')->cascadeOnDelete();
+            $table->unsignedBigInteger('type_id')->index();
             $table->string('name');
             $table->string('slug');
             $table->unsignedInteger('sort_order')->default(0);
