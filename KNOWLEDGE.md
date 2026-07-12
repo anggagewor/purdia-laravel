@@ -338,7 +338,52 @@ Single lookup: `GET /api/lookups/gender`
 - [x] Identity module (auth: register, login, logout, refresh)
 - [x] Authorization module (RBAC: roles, permissions, middleware, full CRUD)
 - [x] Config module (DB-driven config per module, grouped, dot notation)
-- [x] Reference module (countries, currencies — seeded data)
+- [x] Reference module (countries, currencies, units, lookups — seeded data)
+- [x] Storage module (file management, access control, storage rules)
+
+### Storage ✅
+
+File management with metadata, access control, and storage rules.
+
+**Design:**
+- Metadata only di DB — file fisik di Laravel filesystem (disk configurable)
+- Storage rules: auto-route file ke disk/path berdasarkan mime type atau extension
+- Access control per-file: public, private, restricted (per-user atau per-role)
+- Access levels: read_only, read_write, full_control
+- Polymorphic entity attachment (file bisa di-attach ke entity apapun via entity_type + entity_id)
+
+**Models:** File, FileAccess, StorageRule
+
+**Tables:** files, file_accesses, storage_rules
+
+**Visibility:**
+| Type | Behavior |
+|------|----------|
+| `public` | Siapapun bisa akses, return direct URL |
+| `private` | Hanya uploader (owner) yang bisa akses |
+| `restricted` | Berdasarkan access list (user/role) |
+
+**Access Level:**
+| Level | Can |
+|-------|-----|
+| `read_only` | Download/view |
+| `read_write` | Download + replace/update |
+| `full_control` | Download + update + delete + manage access |
+
+**Storage Rules (auto-routing):**
+```
+mime_pattern: "image/*" → disk: "s3", path_prefix: "images/", max_size: 5MB
+extension_pattern: "pdf" → disk: "local", path_prefix: "documents/"
+```
+
+**Endpoints:**
+- `POST /api/files` — Upload file
+- `GET /api/files/{id}` — Get file metadata
+- `GET /api/files/{id}/download` — Download file (access-checked)
+- `DELETE /api/files/{id}` — Delete file
+- `POST /api/files/{id}/access` — Grant access to user/role
+- `DELETE /api/files/{id}/access` — Revoke access
+- `GET /api/files/entity/{type}/{id}` — Get files attached to an entity
 
 ### Phase 2 — Core Business (Planned)
 - [ ] POS module
@@ -461,3 +506,6 @@ Request config value
 | 2026-07-12 | Reference module untuk master data | Countries, currencies — seeded, read-only. Foundation buat module bisnis (POS, Inventory) |
 | 2026-07-12 | Generic lookup system | Data simple (gender, religion, dll) pake lookup_types + lookup_items. Extensible tanpa code change |
 | 2026-07-12 | Unified /api/lookups endpoint | Single request buat multiple reference data. Hemat API call buat form filling |
+| 2026-07-12 | Storage module — metadata only di DB | File fisik di filesystem (disk), DB cuma simpan metadata + access control |
+| 2026-07-12 | Storage rules buat auto-routing | File otomatis masuk disk/path yang tepat berdasarkan mime type atau extension |
+| 2026-07-12 | File access control: public/private/restricted | Restricted pake access list per user/role dengan level read_only/read_write/full_control |
