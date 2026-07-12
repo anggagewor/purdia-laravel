@@ -6,6 +6,8 @@ use Illuminate\Support\Collection;
 use Purdia\Authorization\Domain\Contracts\RoleRepository;
 use Purdia\Authorization\Domain\Models\Role;
 use Purdia\Identity\Domain\Models\User;
+use Purdia\Tenant\Application\Context\TenantContext;
+use Purdia\Tenant\Domain\Models\TenantUser;
 
 class EloquentRoleRepository implements RoleRepository
 {
@@ -21,13 +23,28 @@ class EloquentRoleRepository implements RoleRepository
 
     public function userRoles(string $userId): Collection
     {
-        $user = User::find($userId);
+        // Prefer tenant-aware roles
+        if (TenantContext::isResolved()) {
+            $roleIds = TenantUser::where('user_id', $userId)
+                ->where('tenant_id', TenantContext::tenantId())
+                ->where('is_active', true)
+                ->pluck('role_id');
 
-        if (! $user) {
-            return collect();
+            return Role::whereIn('id', $roleIds)->get();
         }
 
-        return $user->roles;
+        // Fallback
+        $roleIds = TenantUser::where('user_id', $userId)
+            ->where('is_active', true)
+            ->pluck('role_id');
+
+        if ($roleIds->isNotEmpty()) {
+            return Role::whereIn('id', $roleIds)->get();
+        }
+
+        $user = User::find($userId);
+
+        return $user ? $user->roles : collect();
     }
 
     public function all(): Collection

@@ -2,6 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 use Purdia\Identity\Presentation\Controllers\AuthController;
+use Purdia\Identity\Presentation\Controllers\UserController;
+use Purdia\Tenant\Infrastructure\Middleware\ResolveTenant;
 
 Route::prefix('auth')->as('auth.')->group(function () {
     // Public (unauthenticated)
@@ -18,3 +20,15 @@ Route::prefix('auth')->as('auth.')->group(function () {
         Route::put('/change-password', [AuthController::class, 'changePassword'])->name('change-password');
     });
 });
+
+// User management (tenant-scoped)
+Route::middleware(['auth:sanctum', ResolveTenant::class])
+    ->prefix('users')
+    ->as('users.')
+    ->group(function () {
+        Route::get('/', [UserController::class, 'index'])->name('index');
+        Route::post('/', [UserController::class, 'store'])->name('store');
+        Route::get('/{user}', [UserController::class, 'show'])->name('show');
+        Route::put('/{user}', [UserController::class, 'update'])->name('update');
+        Route::delete('/{user}', [UserController::class, 'destroy'])->name('destroy');
+    });
