@@ -4,6 +4,24 @@ Rules ini WAJIB diikuti untuk semua code yang ditulis dalam project ini.
 
 ---
 
+## 0. AI Instructions
+
+Sebelum generate code apapun:
+
+1. Baca `KNOWLEDGE.md` — pahami arsitektur, keputusan, dan progress saat ini
+2. Baca file ini (`coding-rules.md`) — ikuti semua convention tanpa exception
+3. Ikuti pattern module yang sudah ada — consistency over cleverness
+4. Jangan introduce arsitektur/pattern baru tanpa update Decision Log di `KNOWLEDGE.md` terlebih dahulu
+
+Prinsip:
+- **Kalau ragu, ikuti module yang sudah ada.** Jangan invent pattern baru.
+- **Kalau butuh pattern baru** — update `KNOWLEDGE.md` dulu (decision log + rationale), baru implementasi.
+- **Jangan bikin abstraksi kalau baru dipakai sekali.** Abstraksi earned, bukan direncanakan.
+- **Jangan implement fitur masa depan** kecuali requirement saat ini benar-benar butuh. YAGNI.
+- **Prefer boring code yang konsisten** daripada clever code yang cuma lu yang ngerti.
+
+---
+
 ## 1. Module Boundary Rules (STRICT)
 
 ### 1.1 Cross-Module Communication
