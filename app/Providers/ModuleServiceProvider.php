@@ -14,6 +14,7 @@ class ModuleServiceProvider extends ServiceProvider
         \Purdia\Shared\Providers\SharedServiceProvider::class,
         \Purdia\Identity\Infrastructure\Providers\IdentityServiceProvider::class,
         \Purdia\Authorization\Infrastructure\Providers\AuthorizationServiceProvider::class,
+        \Purdia\Config\Infrastructure\Providers\ConfigServiceProvider::class,
     ];
 
     public function register(): void

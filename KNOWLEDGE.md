@@ -196,6 +196,55 @@ Role-based access control with granular permissions.
 
 **Gateway:** `AuthorizationGateway` — userCan, userPermissions, userRoles
 
+**Endpoints:**
+- `GET /api/roles` — List all roles with permissions
+- `POST /api/roles` — Create role
+- `GET /api/roles/{id}` — Get role detail
+- `PUT /api/roles/{id}` — Update role
+- `DELETE /api/roles/{id}` — Delete role
+- `PUT /api/roles/{id}/permissions` — Sync permissions to role
+- `GET /api/permissions` — List all permissions
+- `POST /api/permissions` — Create permission
+- `GET /api/permissions/{id}` — Get permission detail
+- `PUT /api/permissions/{id}` — Update permission
+- `DELETE /api/permissions/{id}` — Delete permission
+
+### Config ✅
+
+Database-driven configuration system. Each module can store its own config without touching code.
+
+**Design:**
+- Grouped by module name (e.g., `pos`, `inventory`, `identity`)
+- Global configs use group `general`
+- Key uses dot notation within group for namespacing
+- Unique constraint on `group` + `key` combo (same key name allowed in different groups)
+- Values stored as text, typed on retrieval (string, boolean, integer, float, json, array)
+
+**Models:** Config
+
+**Tables:** configs (group, key, value, type)
+
+**Gateway:** `ConfigGateway` — get, has (read-only for other modules)
+
+**Endpoints:**
+- `GET /api/configs` — List all config groups
+- `GET /api/configs/{group}` — Get all configs in a group
+- `PUT /api/configs/{group}` — Set a single config value
+- `PUT /api/configs/{group}/bulk` — Bulk set multiple configs
+- `DELETE /api/configs/{group}/{key}` — Delete a config entry
+
+**Usage from other modules:**
+```php
+// Inject the gateway
+public function __construct(
+    private readonly ConfigGateway $config,
+) {}
+
+// Read config
+$taxRate = $this->config->get('pos', 'tax_rate', 11);
+$appName = $this->config->get('general', 'app.name', 'Purdia');
+```
+
 ---
 
 ## Roadmap
@@ -205,7 +254,8 @@ Role-based access control with granular permissions.
 - [x] Modular DDD structure
 - [x] Shared module (contracts, exceptions, helpers)
 - [x] Identity module (auth: register, login, logout, refresh)
-- [x] Authorization module (RBAC: roles, permissions, middleware)
+- [x] Authorization module (RBAC: roles, permissions, middleware, full CRUD)
+- [x] Config module (DB-driven config per module, grouped, dot notation)
 
 ### Phase 2 — Core Business (Planned)
 - [ ] POS module
@@ -249,3 +299,5 @@ Role-based access control with granular permissions.
 | 2026-07-12 | Sanctum for auth | Laravel native, simple, revocable tokens |
 | 2026-07-12 | Authorization as separate module | Auth ≠ Authorization. Different bounded contexts |
 | 2026-07-12 | Se-native mungkin dengan Laravel | Upgrade-friendly, DDD di struktur bukan melawan framework |
+| 2026-07-12 | Config module with DB storage | Avoid code changes for config. Grouped by module, dot-notation keys, typed values |
+| 2026-07-12 | Global config group = "general" | Shared/non-module configs pakai group "general" |
