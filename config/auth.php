@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\User;
+use Purdia\Identity\Domain\Models\User;
 
 return [
 
