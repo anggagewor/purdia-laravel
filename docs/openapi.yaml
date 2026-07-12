@@ -86,6 +86,33 @@ components:
           type: string
           format: date-time
 
+    Menu:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        path:
+          type: string
+          nullable: true
+        icon:
+          type: string
+          nullable: true
+        permission:
+          type: string
+          nullable: true
+        sort_order:
+          type: integer
+        is_visible:
+          type: boolean
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/Menu'
+
 tags:
   - name: Auth
     description: Authentication (Identity module)
@@ -113,6 +140,8 @@ tags:
     description: Product catalog (products, categories, brands)
   - name: Pricing
     description: Pricing Engine (price lists, discounts, promotions)
+  - name: Menus
+    description: Navigation menu management (permission-filtered)
 
 paths:
   # ============================================================
@@ -225,6 +254,80 @@ paths:
                 properties:
                   data:
                     $ref: '#/components/schemas/User'
+
+  /auth/change-password:
+    put:
+      tags: [Auth]
+      summary: Change password (authenticated)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_password, new_password, new_password_confirmation]
+              properties:
+                current_password:
+                  type: string
+                new_password:
+                  type: string
+                  minLength: 8
+                new_password_confirmation:
+                  type: string
+      responses:
+        '200':
+          description: Password changed
+        '422':
+          description: Current password mismatch or validation error
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Request password reset link
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Reset link sent (always returns success to prevent email enumeration)
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Reset password with token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, token, password, password_confirmation]
+              properties:
+                email:
+                  type: string
+                  format: email
+                token:
+                  type: string
+                password:
+                  type: string
+                  minLength: 8
+                password_confirmation:
+                  type: string
+      responses:
+        '200':
+          description: Password reset successful
+        '422':
+          description: Invalid or expired token
 
   # ============================================================
   # ROLES & PERMISSIONS
@@ -1730,3 +1833,175 @@ paths:
         '201':
           description: Promotion created
 
+
+  # ============================================================
+  # MENUS (NAVIGATION)
+  # ============================================================
+  /menus:
+    get:
+      tags: [Menus]
+      summary: List all menus (admin, full tree)
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+      responses:
+        '200':
+          description: Full menu tree (unfiltered)
+    post:
+      tags: [Menus]
+      summary: Create a menu item
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, slug]
+              properties:
+                name:
+                  type: string
+                  example: Sales
+                slug:
+                  type: string
+                  example: sales
+                path:
+                  type: string
+                  example: /sales
+                  nullable: true
+                icon:
+                  type: string
+                  example: shopping-cart
+                  nullable: true
+                permission:
+                  type: string
+                  example: sales.page.index.view
+                  nullable: true
+                parent_id:
+                  type: integer
+                  nullable: true
+                sort_order:
+                  type: integer
+                  default: 0
+                is_visible:
+                  type: boolean
+                  default: true
+      responses:
+        '201':
+          description: Menu created
+
+  /menus/tree:
+    get:
+      tags: [Menus]
+      summary: Get menu tree filtered by user permissions (for frontend sidebar)
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+      responses:
+        '200':
+          description: Permission-filtered menu tree
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Menu'
+
+  /menus/reorder:
+    put:
+      tags: [Menus]
+      summary: Bulk reorder menus (sort + reparent)
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required: [id, sort_order]
+                    properties:
+                      id:
+                        type: integer
+                      sort_order:
+                        type: integer
+                      parent_id:
+                        type: integer
+                        nullable: true
+      responses:
+        '200':
+          description: Menus reordered
+
+  /menus/{menu}:
+    get:
+      tags: [Menus]
+      summary: Get menu detail with children
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+        - name: menu
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Menu with children
+    put:
+      tags: [Menus]
+      summary: Update a menu item
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+        - name: menu
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                slug:
+                  type: string
+                path:
+                  type: string
+                icon:
+                  type: string
+                permission:
+                  type: string
+                parent_id:
+                  type: integer
+                sort_order:
+                  type: integer
+                is_visible:
+                  type: boolean
+                is_active:
+                  type: boolean
+      responses:
+        '200':
+          description: Menu updated
+    delete:
+      tags: [Menus]
+      summary: Delete a menu item
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+        - name: menu
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Menu deleted

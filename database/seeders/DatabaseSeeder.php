@@ -15,6 +15,7 @@ class DatabaseSeeder extends Seeder
             CountrySeeder::class,
             UnitSeeder::class,
             LookupSeeder::class,
+            SetupSeeder::class,
         ]);
     }
 }
