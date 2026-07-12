@@ -22,9 +22,16 @@ class AuthorizationServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->registerRoutes();
         $this->loadMigrationsFrom(__DIR__.'/../Database/Migrations');
-
         $this->registerGate();
+    }
+
+    private function registerRoutes(): void
+    {
+        \Illuminate\Support\Facades\Route::prefix('api')
+            ->middleware('api')
+            ->group(__DIR__.'/../Routes/api.php');
     }
 
     private function registerGate(): void

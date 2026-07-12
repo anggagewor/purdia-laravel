@@ -55,4 +55,4 @@ See [KNOWLEDGE.md](./KNOWLEDGE.md) for architecture decisions, roadmap, and deve
 
 ## License
 
-Proprietary. All rights reserved.
+MIT License. See [LICENSE](./LICENSE) for details.
