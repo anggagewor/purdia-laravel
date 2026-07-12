@@ -24,14 +24,28 @@ Prinsip:
 
 ## 1. Module Boundary Rules (STRICT)
 
-### 1.1 Cross-Module Communication
+### 1.1 Layer Dependency (NON-NEGOTIABLE)
+```
+Foundation    → depends on: NOTHING above
+Engines       → depends on: Foundation ONLY
+Building Blocks → depends on: Foundation + Engines (via contracts)
+Business Modules → depends on: Foundation + Engines + Building Blocks (via contracts)
+```
+
+- ❌ Foundation TIDAK BOLEH depend ke Engine/Block/Module
+- ❌ Engine TIDAK BOLEH depend ke Engine lain (no circular)
+- ❌ Building Block TIDAK BOLEH depend ke Building Block lain secara langsung
+- ❌ Business Module TIDAK BOLEH implement logic yang harusnya di Engine
+- ❌ Business Module TIDAK BOLEH import Business Module lain
+
+### 1.2 Cross-Module Communication
 - Module DILARANG import class langsung dari module lain
 - Module HANYA BOLEH depend ke `Purdia\Shared\Contracts\*`, `Purdia\Shared\DTOs\*`, `Purdia\Shared\Events\*`
 - Data yang cross module boundary WAJIB dibungkus DTO
-- Komunikasi sync: lewat Gateway interface
+- Komunikasi sync: lewat Gateway/Engine interface
 - Komunikasi async: lewat Domain Event
 
-### 1.2 Dependency Direction
+### 1.3 Dependency Direction (within a module)
 ```
 Presentation → Application → Domain ← Infrastructure
 ```
@@ -41,11 +55,16 @@ Presentation → Application → Domain ← Infrastructure
 - Infrastructure implement interface dari Domain
 - Presentation hanya memanggil Application layer
 
-### 1.3 Module Isolation
+### 1.4 Module Isolation
 - Tiap module punya ServiceProvider sendiri
 - Tiap module punya route file sendiri
 - Tiap module punya migration sendiri
 - Tiap module register bindings sendiri di ServiceProvider
+
+### 1.5 Engine Pattern
+- Business module TIPIS — hanya orchestrate engines
+- Business module NEVER implement domain logic sendiri
+- Domain logic HARUS di Engine, di-expose via contract
 
 ---
 
@@ -62,6 +81,7 @@ Presentation → Application → Domain ← Infrastructure
 | DTO | {Purpose}DTO | `RegisterDTO`, `LoginDTO`, `CreateRoleDTO` |
 | Exception | {Description}Exception | `InvalidCredentialsException` |
 | Gateway interface | {Module}Gateway | `IdentityGateway`, `AuthorizationGateway` |
+| Engine interface | {Name}Engine | `PricingEngine`, `DocumentEngine`, `InventoryEngine` |
 | Gateway impl | {Module}GatewayImpl | `IdentityGatewayImpl` |
 | Repository interface | {Model}Repository | `UserRepository`, `RoleRepository` |
 | Repository impl | Eloquent{Model}Repository | `EloquentUserRepository` |

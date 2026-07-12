@@ -1,60 +1,232 @@
 # Purdia — Knowledge Base
 
-Internal documentation for architecture decisions, conventions, and development progress.
+> **Composable Business Platform** — bukan ERP biasa, tapi platform untuk membangun aplikasi bisnis dengan domain yang dipisah berdasarkan kapabilitas inti.
 
 ---
 
-## Architecture Overview
+## Identity & Vision
 
-Purdia uses a **Modular DDD** approach on top of Laravel. The philosophy:
+Purdia bukan kumpulan modul ERP. Purdia adalah sekumpulan **bounded context kecil** yang bisa dikomposisi menjadi aplikasi bisnis apapun.
 
-- **Strict outside** — Module boundaries, contracts, DTOs, and error formats are non-negotiable
-- **Flexible inside** — Each module can be as simple or complex as needed
-- **Laravel native** — We use Eloquent, Sanctum, Gates, Middleware, Events. DDD lives in folder structure, not against the framework
+**Prinsip utama:**
+- Modul dipisah berdasarkan **kapabilitas**, bukan berdasarkan menu atau departemen
+- Business module itu TIPIS — cuma orchestrate engines
+- Jangan bikin modul berdasarkan nama menu (Customer, Supplier, Employee). Yang benar: Party.
+- Jangan bikin modul berdasarkan proses (Purchase, Sales, POS). Yang benar: compose Inventory + Pricing + Document.
 
-### Directory Structure
+---
+
+## Architecture Layers
 
 ```
-src/                         → Domain layer (namespace: Purdia\)
-├── Shared/                  → Shared kernel (contracts, DTOs, events, exceptions)
-├── Identity/                → Authentication module
-├── Authorization/           → RBAC module
-└── [ModuleName]/            → Future modules follow same pattern
-
-app/                         → Laravel glue (thin, wiring only)
-├── Providers/
-│   ├── AppServiceProvider.php
-│   └── ModuleServiceProvider.php  → Registers all module providers
+┌─────────────────────────────────────────────────────────────┐
+│  LAYER 3: Business Modules (thin orchestration)             │
+│  CRM, POS, Sales, Purchasing, HRM, Finance, Manufacturing  │
+├─────────────────────────────────────────────────────────────┤
+│  LAYER 2: Building Blocks (shared business entities)        │
+│  Party, Catalog, Classification, Comment, Activity,         │
+│  Audit, Dimension                                           │
+├─────────────────────────────────────────────────────────────┤
+│  LAYER 1: Engines (domain logic core)                       │
+│  Document, Workflow, Pricing, Tax, Inventory, Notification  │
+├─────────────────────────────────────────────────────────────┤
+│  LAYER 0: Foundation (infrastructure)                       │
+│  Shared, Identity, Authorization, Tenant, Config,           │
+│  Storage, Reference                                         │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### Module Anatomy
+### Dependency Rules (STRICT — NON-NEGOTIABLE)
 
-Each module follows this structure (use only what's needed):
+```
+Foundation    → depends on: NOTHING above
+Engines       → depends on: Foundation ONLY
+Building Blocks → depends on: Foundation + Engines (via contracts)
+Business Modules → depends on: Foundation + Engines + Building Blocks (via contracts)
+```
+
+**FORBIDDEN:**
+- ❌ Foundation depend ke Engine/Block/Module
+- ❌ Engine depend ke Engine lain (no circular)
+- ❌ Building Block depend ke Building Block lain secara langsung
+- ❌ Business Module implement logic sendiri yang harusnya di Engine
+- ❌ Business Module import Business Module lain
+
+**ALLOWED:**
+- ✅ Business Module orchestrate multiple Engines
+- ✅ Building Block consume Engine via contract
+- ✅ Cross-layer communication via Shared contracts/events only
+
+---
+
+## Layer 0: Foundation (DONE)
+
+| Module | Status | Description |
+|--------|--------|-------------|
+| Shared | ✅ | Contracts, DTOs, events, traits, exceptions, helpers |
+| Identity | ✅ | Auth (register, login, logout, refresh). Sanctum. |
+| Authorization | ✅ | RBAC (roles, permissions, granular). Gate + Middleware. |
+| Tenant | ✅ | Multi-company, branch (store/warehouse/office/factory/virtual), context |
+| Config | ✅ | DB-driven settings. Grouped per module. |
+| Storage | ✅ | File management, access control, storage rules, attachment |
+| Reference | ✅ | Countries, currencies, units, timezones, languages, tax categories, lookups |
+
+---
+
+## Layer 1: Engines (Planned)
+
+Engines = **pure domain logic**. Mereka nggak punya UI. Mereka expose contract/interface yang dipake layer di atasnya.
+
+| Engine | Contains | Used By |
+|--------|----------|---------|
+| **Document** | Sequence, Numbering, Lifecycle (status), Revision | ALL business modules |
+| **Workflow** | State Machine, Transition, Condition, Action | Purchasing, HRM, Finance, any approval flow |
+| **Pricing** | Price List, Discount, Promotion, Price Resolution | POS, Sales, CRM, B2B |
+| **Tax** | Tax Rule, Tax Group, Tax Rate, Tax Authority, Tax Area | POS, Sales, Purchasing, Finance |
+| **Inventory** | Stock, Movement, Reservation, Adjustment | POS, Sales, Purchasing, Manufacturing |
+| **Notification** | Channel (email/WA/push/SMS/slack), Template, Dispatch | ALL |
+
+### Engine Pattern
+
+```php
+// Business module NEVER calculates — it delegates to engine
+$price = $pricingEngine->resolve($product, $customer, $branch);
+$tax = $taxEngine->calculate($price, $taxRules);
+$reservation = $inventoryEngine->reserve($product, $qty, $branch);
+$number = $documentEngine->generate('INV', $branch);
+$workflow = $workflowEngine->submit($document);
+```
+
+### Key Design Notes
+
+**Document Engine:**
+- Sequence: configurable numbering format (`INV-BDG-{YYYY}{MM}-{####}`)
+- Lifecycle: Draft → Submitted → Approved → Rejected → Cancelled → Archived
+- Revision: version tracking (Quotation Rev 1, Rev 2, Rev 3)
+- Document nyimpan state. Workflow ngatur transition rules.
+
+**Workflow Engine:**
+- Generic state machine, BUKAN hardcode approval
+- Transition → Condition → Action
+- Condition: `amount > 10_000_000`, `country == 'ID'`, `branch.type == 'warehouse'`
+- Action: approve, reject, notify, assign, trigger event
+
+**Inventory Engine:**
+- Cuma tau Movement (+/-). Nggak peduli sumber (POS, Purchase, Manufacturing).
+- Stock ≠ Available. Available = Stock - Reserved.
+- Reservation layer terpisah. Inventory nggak tau siapa yang reserve.
+
+**Pricing Engine:**
+- Resolve harga berdasarkan: product, customer, branch, qty, date
+- Apply discount rules, promotion rules
+- Final price = Pricing.resolve() + Tax.calculate()
+
+**Tax Engine:**
+- Eventually pisah dari Pricing (complex enough for own module)
+- Support multi-scheme: VAT, GST, PPN, Sales Tax, Withholding Tax
+- Tax Rule, Tax Group, Tax Authority, Tax Rate, Tax Area
+
+**Notification Engine:**
+- Channel-based (pluggable): Email, WA, Push, SMS, Slack, Discord
+- Template engine: satu template, render ke multiple channels
+- Register channel kayak plugin
+
+---
+
+## Layer 2: Building Blocks (Planned)
+
+Building Blocks = **shared business entities**. Dipakai banyak module.
+
+| Block | Contains | Used By |
+|-------|----------|---------|
+| **Party** | Person, Organization, Contact, Address, Relationship, Business Role | CRM, HRM, Purchasing, Sales, ALL |
+| **Catalog** | Product, Category, Brand, Variant, Attribute, Barcode | POS, Inventory, Sales, Manufacturing |
+| **Classification** | Tag, Label, Custom Field | ALL (polymorphic) |
+| **Comment** | Comment, Mention, Reaction, Thread, Resolve | CRM, Project, Ticket, HR |
+| **Activity** | Business timeline (event-driven) | ALL |
+| **Audit** | Field-level change tracking | ALL |
+| **Dimension** | Cost Center, Department, Project, Region, Business Unit, Profit Center | Finance, HRM, Inventory, Sales |
+
+### Key Design Notes
+
+**Party:**
+```
+parties (id, type, display_name)
+├── persons (party_id, first_name, last_name, birth_date, gender, ...)
+└── organizations (party_id, legal_name, tax_number, npwp, nib, ...)
+
+contacts (party_id, type, value) — email, phone, etc
+addresses (party_id, type, ...) — billing, shipping, etc
+relationships (party_a_id, party_b_id, type) — owns, works_for, reports_to
+```
+
+- Customer = Party with business role "customer"
+- Supplier = Party with business role "supplier"  
+- Employee = Party with business role "employee"
+- Party itu identity. Business role itu label.
+
+**Catalog:**
+- Product NGGAK punya image langsung. Image lewat Storage → Attachment (polymorphic).
+- Catalog nggak tau file. Catalog nggak tau harga. Harga di Pricing Engine.
+
+**Activity:**
+- Source of truth = Domain Event. Jangan `Activity::create()` di mana-mana.
+- Activity subscribe ke events: `InvoiceCreated → Activity`, `PaymentReceived → Activity`
+
+**Dimension:**
+- Generic entity untuk analitik/grouping
+- Finance pake buat jurnal (cost center, profit center)
+- HRM pake buat department
+- Inventory pake buat warehouse region
+- Sales pake buat territory
+- Satu konsep, lintas modul
+
+---
+
+## Layer 3: Business Modules (Future)
+
+Business modules = **thin orchestration**. Mereka compose engines dan building blocks.
+
+| Module | Orchestrates | Description |
+|--------|-------------|-------------|
+| **CRM** | Party + Pricing + Document + Activity + Classification | Lead, Opportunity, Pipeline, Quotation |
+| **POS** | Party + Catalog + Pricing + Tax + Inventory + Document | Cart, Checkout, Receipt |
+| **Sales** | Party + Catalog + Pricing + Tax + Inventory + Document + Workflow | SO, Invoice, Payment |
+| **Purchasing** | Party + Catalog + Pricing + Tax + Inventory + Document + Workflow | PO, Goods Receive |
+| **HRM** | Party + Document + Workflow + Dimension | Employee, Leave, Payroll, Attendance |
+| **Finance** | Document + Dimension + Tax + Party | Journal, Account, Reconciliation |
+| **Manufacturing** | Catalog + Inventory + Document + Workflow | BOM, Work Order, Production |
+| **Project** | Party + Activity + Comment + Dimension | Task, Milestone, Timesheet |
+
+---
+
+## Module Structure
 
 ```
 src/[ModuleName]/
 ├── Domain/
 │   ├── Models/              → Eloquent models
-│   ├── Contracts/           → Repository interfaces
-│   ├── Enums/               → PHP enums (stored as string in DB)
+│   ├── Contracts/           → Repository/Engine interfaces
+│   ├── Enums/               → PHP enums (string-backed, NO DB enum)
 │   └── Events/              → Internal domain events
 ├── Application/
 │   ├── Actions/             → Use cases (single responsibility)
 │   ├── DTOs/                → Plain readonly classes
-│   └── Exceptions/          → Module-specific errors (extend DomainException)
+│   ├── Exceptions/          → Extend DomainException
+│   └── Engine/              → Engine implementation (Layer 1 only)
 ├── Infrastructure/
 │   ├── Providers/           → Module ServiceProvider
 │   ├── Repositories/        → Concrete implementations
-│   ├── Gateway/             → Gateway implementation (for cross-module access)
+│   ├── Gateway/             → Gateway/Context adapter
 │   ├── Routes/              → Module route files
-│   ├── Middleware/           → Module-specific middleware
+│   ├── Middleware/
 │   └── Database/
 │       ├── Migrations/
 │       ├── Factories/
 │       └── Seeders/
 └── Presentation/
     ├── Controllers/         → Thin, dispatch to Actions
-    ├── Requests/            → Laravel Form Requests (input validation)
+    ├── Requests/            → Laravel Form Requests
     └── Resources/
         └── V1/              → API Resources (response contract)
 ```
@@ -65,502 +237,147 @@ src/[ModuleName]/
 
 ### Cross-Module Communication
 
-| Method | When | Direction |
-|--------|------|-----------|
-| Gateway (interface) | Need data from another module synchronously | Module A → Shared Contract → Module B implements |
-| Domain Event | Side effects, fire-and-forget | Publisher dispatches, any module can listen |
-
-**Rules:**
-1. Module MUST NOT import classes directly from another module
-2. Module CAN depend on `Purdia\Shared\Contracts\*` and `Purdia\Shared\DTOs\*`
-3. Data crossing module boundary MUST be wrapped in a DTO
-4. Events are sync by default, opt-in to queue via `ShouldQueue`
+| Method | When |
+|--------|------|
+| Gateway/Contract (sync) | Need data from another module |
+| Domain Event (async-ready) | Side effects, fire-and-forget |
+| TenantContext | Access current tenant/branch |
+| Engine contract | Delegate domain logic |
 
 ### Naming
 
 | Thing | Convention | Example |
 |-------|-----------|---------|
-| Cross-module interface | `{Module}Gateway` | `IdentityGateway` |
-| Use case | `{Verb}{Noun}Action` | `RegisterAction`, `AssignRoleToUserAction` |
-| DTO | `{Purpose}DTO` | `RegisterDTO`, `AuthTokenDTO` |
+| Engine interface | `{Name}Engine` | `PricingEngine`, `DocumentEngine` |
+| Gateway interface | `{Module}Gateway` | `IdentityGateway` |
+| Action | `{Verb}{Noun}Action` | `RegisterAction`, `CreateRoleAction` |
+| DTO | `{Purpose}DTO` | `RegisterDTO`, `CreateBranchDTO` |
 | Exception | `{Description}Exception` | `InvalidCredentialsException` |
 | Error code | `MODULE.ERROR_NAME` | `IDENTITY.INVALID_CREDENTIALS` |
-| Permission | `{module}.{scope}.{resource}.{action}` | `orders.page.index.button.create` |
+| Permission | `{module}.{scope}.{resource}.{action}` | `orders.action.create` |
 
 ### DTOs
-
 - Always `final readonly class`
 - Constructor promotion only
-- No methods, no logic — pure data carriers
+- No methods, no logic
 
 ### Enums
-
-- PHP native `enum` with `string` backing
-- Stored as `string` column in DB (NO `enum` type in migrations)
-- Cast via Laravel model `casts()`
+- PHP native `enum` with `string` or `int` backing
+- Stored as `string` column in DB (NEVER `enum()` in migration)
+- Cast via `casts()` method
 
 ### Error Handling
-
-All domain errors extend `Purdia\Shared\Exceptions\DomainException`:
-
-```php
-abstract class DomainException extends RuntimeException
-{
-    public readonly string $errorCode;
-    public readonly int $httpStatus;
-    public readonly array $context;
-}
-```
-
-API response format:
 ```json
-{
-    "error": {
-        "code": "MODULE.ERROR_NAME",
-        "message": "Human readable message",
-        "context": {}
-    }
-}
+{"error": {"code": "MODULE.ERROR", "message": "...", "context": {}}}
 ```
 
-### API Response Format
-
-Success:
+### API Response
 ```json
-{
-    "message": "Optional message",
-    "data": { ... }
-}
+{"message": "...", "data": {...}}
 ```
 
-### Repository Pattern
-
-- Interface defined in `Domain/Contracts/`
-- Implementation in `Infrastructure/Repositories/`
-- Bound in module's ServiceProvider
-- Domain layer is storage-agnostic (doesn't know about MySQL, Mongo, etc)
-
-### Authentication
-
-- Laravel Sanctum (token-based)
-- Stateless — no sessions
-- Token rotation via refresh endpoint
-
-### Authorization (RBAC)
-
-- User has many Roles (many-to-many)
-- Role has many Permissions (many-to-many)
-- Effective permissions = union of all permissions from all assigned roles
-- Permission check via middleware: `middleware('permission:permission.name')`
-- Also available via Laravel Gate: `Gate::authorize('permission.name')`
+### Models (Phase 2+ business tables)
+- WAJIB: `use BelongsToTenant, HasAudit, SoftDeletes;`
+- WAJIB: `tenant_id` column
+- Optional: `branch_id` column (for branch-scoped data)
 
 ---
 
-## Modules
+## Current Progress
 
-### Shared ✅
-
-Foundation utilities used across all modules.
-
-**Contains:**
-- `Contracts/` — Cross-module interfaces (Gateway pattern)
-- `DTOs/` — Shared data transfer objects
-- `Events/` — Cross-module domain events
-- `Exceptions/` — Base DomainException + API renderer
-- `Support/` — ApiResponse helper
-
-### Identity ✅
-
-Authentication and user management.
-
-**Endpoints:**
-- `POST /api/auth/register` — Create account + get token
-- `POST /api/auth/login` — Authenticate + get token
-- `POST /api/auth/logout` — Revoke current token
-- `POST /api/auth/refresh` — Rotate token (delete old, create new)
-- `GET /api/auth/me` — Get authenticated user profile
-
-**Models:** User
-
-**Gateway:** `IdentityGateway` — resolveUser, resolveUserByEmail
-
-### Authorization ✅
-
-Role-based access control with granular permissions.
-
-**Models:** Role, Permission
-
-**Tables:** roles, permissions, role_permission, user_role
-
-**Middleware:** `permission:{name}` — checks if authenticated user has permission
-
-**Gateway:** `AuthorizationGateway` — userCan, userPermissions, userRoles
-
-**Endpoints:**
-- `GET /api/roles` — List all roles with permissions
-- `POST /api/roles` — Create role
-- `GET /api/roles/{id}` — Get role detail
-- `PUT /api/roles/{id}` — Update role
-- `DELETE /api/roles/{id}` — Delete role
-- `PUT /api/roles/{id}/permissions` — Sync permissions to role
-- `GET /api/permissions` — List all permissions
-- `POST /api/permissions` — Create permission
-- `GET /api/permissions/{id}` — Get permission detail
-- `PUT /api/permissions/{id}` — Update permission
-- `DELETE /api/permissions/{id}` — Delete permission
-
-### Config ✅
-
-Database-driven configuration system. Each module can store its own config without touching code.
-
-**Design:**
-- Grouped by module name (e.g., `pos`, `inventory`, `identity`)
-- Global configs use group `general`
-- Key uses dot notation within group for namespacing
-- Unique constraint on `group` + `key` combo (same key name allowed in different groups)
-- Values stored as text, typed on retrieval (string, boolean, integer, float, json, array)
-
-**Models:** Config
-
-**Tables:** configs (group, key, value, type)
-
-**Gateway:** `ConfigGateway` — get, has (read-only for other modules)
-
-**Endpoints:**
-- `GET /api/configs` — List all config groups
-- `GET /api/configs/{group}` — Get all configs in a group
-- `PUT /api/configs/{group}` — Set a single config value
-- `PUT /api/configs/{group}/bulk` — Bulk set multiple configs
-- `DELETE /api/configs/{group}/{key}` — Delete a config entry
-
-**Usage from other modules:**
-```php
-// Inject the gateway
-public function __construct(
-    private readonly ConfigGateway $config,
-) {}
-
-// Read config
-$taxRate = $this->config->get('pos', 'tax_rate', 11);
-$appName = $this->config->get('general', 'app.name', 'Purdia');
-```
-
-### Reference ✅
-
-Master/reference data — countries, currencies. Read-only API, seeded from JSON.
-
-**Models:** Country, Currency
-
-**Tables:** countries, currencies
-
-**Data:** 143 countries with their currencies, seeded via `CountrySeeder`
-
-**Endpoints:**
-- `GET /api/references/countries` — List countries (filter: region, search, active_only)
-- `GET /api/references/countries/{id}` — Get country with currency
-- `GET /api/references/currencies` — List currencies (filter: search, active_only)
-- `GET /api/references/currencies/{id}` — Get single currency
-- `GET /api/references/units` — List all unit categories with units
-- `GET /api/references/units/convert?from=kg&to=g&value=5` — Convert between units
-- `GET /api/references/units/{category-slug}` — Get units for a category
-
-**Seeded Data:**
-- 143 countries with currencies
-- 7 unit categories: Weight, Length, Volume, Area, Temperature, Time, Piece
-- 46 units with 104 conversion pairs (bidirectional)
-
-**Unit Categories:**
-| Category | Base Unit | Units |
-|----------|-----------|-------|
-| Weight | g | mg, g, kg, t, oz, lb |
-| Length | m | mm, cm, m, km, in, ft, yd, mi |
-| Volume | l | ml, l, m³, gal, qt, pt, cup, fl oz |
-| Area | m² | mm², cm², m², ha, km², ft², ac |
-| Temperature | °C | °C, °F, K (formula-based, no factor) |
-| Time | s | ms, s, min, h, d, wk, mo, yr |
-| Piece | pcs | pcs, dz, gr, pr, box, pack |
-
-**Seeding:**
-```bash
-php artisan db:seed
-```
-
-**Lookup System:**
-
-Unified endpoint buat ambil banyak reference data dalam 1 request:
-
-```
-GET /api/lookups?types=country,currency,gender,timezone
-```
-
-Response:
-```json
-{
-  "data": {
-    "country": [...],
-    "currency": [...],
-    "gender": [...],
-    "timezone": [...]
-  }
-}
-```
-
-Available lookup types:
-- `country` — dari tabel countries
-- `currency` — dari tabel currencies
-- `timezone` — dari tabel timezones
-- `language` — dari tabel languages
-- `tax-category` — dari tabel tax_categories
-- `unit` — dari tabel unit_categories + units
-- `gender` — dari lookup_items
-- `religion` — dari lookup_items
-- `marital-status` — dari lookup_items
-- `blood-type` — dari lookup_items
-- `education` — dari lookup_items
-- `employment-status` — dari lookup_items
-
-Single lookup: `GET /api/lookups/gender`
-
-**Design:**
-- Data yang punya field complex (timezone, language, tax) → tabel sendiri
-- Data yang cuma id + name (gender, religion, dll) → generic `lookup_types` + `lookup_items`
-- Semua bisa diakses via unified `/api/lookups` endpoint
-- Extensible: tambahin lookup type baru cuma perlu insert data, nggak perlu code baru
-
----
-
-## Roadmap
-
-### Phase 1 — Foundation ✅
-- [x] Project setup (Laravel 13)
+### Foundation (Layer 0) — ✅ COMPLETE
+- [x] Project setup (Laravel 13, Sanctum)
 - [x] Modular DDD structure
-- [x] Shared module (contracts, exceptions, helpers)
+- [x] Shared module (contracts, exceptions, helpers, traits)
 - [x] Identity module (auth: register, login, logout, refresh)
-- [x] Authorization module (RBAC: roles, permissions, middleware, full CRUD)
-- [x] Config module (DB-driven config per module, grouped, dot notation)
-- [x] Reference module (countries, currencies, units, lookups — seeded data)
+- [x] Authorization module (RBAC: roles, permissions, middleware, CRUD)
+- [x] Tenant module (multi-company, branch, context, resolver chain)
+- [x] Config module (DB-driven, grouped, dot notation)
 - [x] Storage module (file management, access control, storage rules)
-- [x] Tenant module (multi-tenancy, branches, context, resolver chain)
+- [x] Reference module (countries, currencies, units, timezones, languages, lookups)
 
-### Storage ✅
+### Engines (Layer 1) — NEXT
+- [ ] Document Engine (sequence, lifecycle, revision)
+- [ ] Party (person, organization, contact, address, relationship)
+- [ ] Catalog (product, category, brand, variant, attribute, barcode)
+- [ ] Pricing Engine (price list, discount, promotion)
+- [ ] Tax Engine (tax rule, group, rate, authority)
+- [ ] Inventory Engine (stock, movement, reservation, adjustment)
+- [ ] Workflow Engine (state machine, transition, condition, action)
+- [ ] Classification (tag, label, custom field)
+- [ ] Activity (event-driven timeline)
+- [ ] Dimension (cost center, department, project, region)
+- [ ] Notification Engine (channel, template, dispatch)
+- [ ] Comment (comment, mention, reaction, thread)
+- [ ] Audit (field-level change tracking)
 
-File management with metadata, access control, and storage rules.
-
-**Design:**
-- Metadata only di DB — file fisik di Laravel filesystem (disk configurable)
-- Storage rules: auto-route file ke disk/path berdasarkan mime type atau extension
-- Access control per-file: public, private, restricted (per-user atau per-role)
-- Access levels: read_only, read_write, full_control
-- Polymorphic entity attachment (file bisa di-attach ke entity apapun via entity_type + entity_id)
-
-**Models:** File, FileAccess, StorageRule
-
-**Tables:** files, file_accesses, storage_rules
-
-**Visibility:**
-| Type | Behavior |
-|------|----------|
-| `public` | Siapapun bisa akses, return direct URL |
-| `private` | Hanya uploader (owner) yang bisa akses |
-| `restricted` | Berdasarkan access list (user/role) |
-
-**Access Level:**
-| Level | Can |
-|-------|-----|
-| `read_only` | Download/view |
-| `read_write` | Download + replace/update |
-| `full_control` | Download + update + delete + manage access |
-
-**Storage Rules (auto-routing):**
-```
-mime_pattern: "image/*" → disk: "s3", path_prefix: "images/", max_size: 5MB
-extension_pattern: "pdf" → disk: "local", path_prefix: "documents/"
-```
-
-**Endpoints:**
-- `POST /api/files` — Upload file
-- `GET /api/files/{id}` — Get file metadata
-- `GET /api/files/{id}/download` — Download file (access-checked)
-- `DELETE /api/files/{id}` — Delete file
-- `POST /api/files/{id}/access` — Grant access to user/role
-- `DELETE /api/files/{id}/access` — Revoke access
-- `GET /api/files/entity/{type}/{id}` — Get files attached to an entity
-
-### Tenant ✅
-
-Multi-tenancy foundation. Tenant = perusahaan/bisnis. Branch = cabang/toko/gudang.
-
-**Design:**
-- 1 Tenant = 1 perusahaan. Branch = toko/outlet/gudang/kantor/factory
-- User many-to-many Tenant (user bisa handle banyak perusahaan)
-- Role per-tenant (user bisa punya role beda di tenant berbeda)
-- Branch access via pivot (kosong = akses semua, ada isi = restrict)
-- Settings inheritance: Branch → Tenant → System default
-- Resolver chain: Header → Subdomain → JWT (extensible)
-- No `owner_id` di tenant — owner ditentukan lewat role
-
-**Models:** Tenant, Branch, TenantUser, BranchUser
-
-**Tables:** tenants, branches, tenant_users, branch_users
-
-**Enums:** BranchType (store, warehouse, office, factory, virtual)
-
-**Context:** `TenantContext` — singleton, single source of truth
-- `TenantContext::tenantId()` — current tenant
-- `TenantContext::branchIds()` — accessible branches
-- `TenantContext::setting('key', default)` — with inheritance
-
-**Shared Interface:** `TenantContextInterface` (for module isolation)
-
-**Traits (Shared):**
-- `BelongsToTenant` — auto-scope + auto-set tenant_id
-- `HasAudit` — auto-set created_by, updated_by, deleted_by
-
-**Middleware:** `tenant` / `ResolveTenant` — resolves tenant dari request
-
-**Endpoints:**
-- `GET /api/tenants` — List user's tenants
-- `POST /api/tenants` — Create tenant (user jadi owner)
-- `GET /api/tenants/{id}` — Get tenant detail
-- `GET /api/branches` — List branches (requires X-Tenant-Id)
-- `POST /api/branches` — Create branch
-- `GET /api/branches/{id}` — Get branch detail
-
-**Architecture Principles:**
-```
-Core tidak boleh tahu module.
-Module tidak boleh saling tahu.
-Komunikasi HANYA lewat contracts, events, atau context.
-
-Module bisnis cuma depend ke:
-- Purdia\Shared\* (contracts, DTOs, events)
-- TenantContextInterface (tenant/branch)
-- AuthorizationGateway (permissions)
-- ConfigGateway (settings)
-```
-
-### Phase 2 — Core Business (Planned)
-- [ ] POS module
-- [ ] Inventory module
-- [ ] CRM module
-- [ ] HRM module
-
-### Phase 3 — Scale
-- [ ] Multi-tenancy activation (scope auto-apply, tenant switching UI)
-- [ ] Audit logging
-- [ ] API versioning (V2)
-- [ ] Queue-based event processing
+### Business Modules (Layer 3) — FUTURE
+- [ ] CRM
+- [ ] POS
+- [ ] Sales
+- [ ] Purchasing
+- [ ] HRM
+- [ ] Finance
+- [ ] Manufacturing
+- [ ] Project
 
 ---
 
-## Architecture Notes & Anticipations
+## Shared Traits
 
-### Transaksi Lintas Modul (Eventual Consistency vs ACID)
+### BelongsToTenant
+- Auto global scope (filter by current tenant)
+- Auto-set `tenant_id` on create
+- `::withoutTenantScope()` for admin operations
 
-Saat ini events di-dispatch secara sync — ini aman dan predictable. Tapi begitu traffic naik dan kita switch ke `ShouldQueue` (async), ada risk: pembayaran sukses tapi stok gagal dikurangi.
+### HasAudit
+- Auto-set `created_by`, `updated_by`, `deleted_by`
+- Via model events (observer pattern)
+- Developer nggak perlu mikir
 
-**Antisipasi:**
-- Siapin **Saga pattern / Compensation handler** sebelum pindah ke async
-- Setiap event yang melibatkan state change lintas module harus punya compensating action (rollback)
-- Contoh: `PaymentCompleted` → reduce stock. Kalau reduce stock gagal → dispatch `StockReductionFailed` → trigger refund/reversal
-- Pertimbangkan **Outbox pattern** — simpan event di DB dulu (guaranteed delivery), baru publish ke queue
+---
 
-**Rule:** Jangan switch ke async tanpa compensation mechanism yang jelas.
+## Tenant Design
 
-### Permission Enforcement di Backend
+- 1 Tenant = 1 perusahaan/bisnis
+- Branch = cabang/toko/gudang/kantor/factory (type enum)
+- User many-to-many Tenant (1 user bisa handle banyak company)
+- Role per-tenant (beda role di beda company)
+- Branch access via separate pivot (`branch_users`)
+- No `owner_id` — owner = role
+- Settings inheritance: Branch → Tenant → System Config → default
+- Resolver chain: Header → Subdomain → JWT (extensible)
+- Context: `TenantContext` (single source of truth)
+- UI: tampilkan "Company" bukan "Tenant"
 
-Permission granular (`orders.page.index.button.create`) sangat berguna buat frontend rendering. Tapi frontend BUKAN security layer.
+---
 
-**Rule:** Setiap action yang butuh permission WAJIB dicek di backend juga:
-- Di route level via middleware: `->middleware('permission:orders.action.create')`
-- Atau di Action class: `Gate::authorize('orders.action.create')`
-- Frontend permission hanya untuk UX (hide/show), bukan security
-
-**Convention:**
-- Permission yang berhubungan dengan UI (button visibility) → scope `component`
-- Permission yang berhubungan dengan API action → scope `action` atau `api`
-- Backend HARUS enforce permission scope `action` dan `api`. Scope `component` dan `page` opsional di backend.
-
-### Multi-Tenancy Preparation (Phase 3)
-
-~~Meskipun multi-tenancy baru di Phase 3~~ — **Tenant module sudah di-implement di Phase 1.**
-
-**Current state:**
-- Tenant model, Branch model, TenantUser, BranchUser — DONE
-- TenantContext + Resolver chain — DONE
-- BelongsToTenant trait — DONE, ready to use
-- HasAudit trait — DONE
-- ResolveTenant middleware — DONE
-
-**What's left for Phase 3 (activation):**
-- Auto-apply BelongsToTenant di semua module bisnis
-- Tenant switching UI flow
-- Tenant billing/plan management
-- tenant_configs table (per-tenant config override)
-
-**Rule untuk Phase 2:**
-- Setiap migration tabel bisnis: WAJIB ada `$table->foreignId('tenant_id')->index()`
-- Model bisnis: WAJIB `use BelongsToTenant, HasAudit, SoftDeletes;`
-- Branch-scoped data: tambah `$table->foreignId('branch_id')->index()`
-- Routes bisnis: tambah `->middleware('tenant')` di group
-
-### Module Independence Principle
+## Settings Inheritance
 
 ```
-Core (Foundation)
-├── Shared, Identity, Authorization, Tenant, Config, Storage, Reference, Audit
-
-Modules (Business)
-├── POS, Inventory, CRM, HRM, Finance, Project
+Branch.setting('tax')     → cek branch settings JSON
+  ↓ fallback
+Tenant.setting('tax')     → cek tenant settings JSON
+  ↓ fallback
+Config.get('general', 'tax')  → cek system config DB
+  ↓ fallback
+default value dari code
 ```
-
-**Rules:**
-- Core TIDAK BOLEH tau module bisnis
-- Module bisnis TIDAK BOLEH saling import
-- Komunikasi HANYA lewat: contracts, events, atau TenantContext
-- Module bisnis depend ke Shared contracts only
-
-### Config & Multi-Tenancy Strategy
-
-Config module yang sekarang (`configs` table) adalah **system-level config** — berlaku untuk seluruh system, bukan per-tenant. Tidak perlu tenant_id.
-
-**Alasan:**
-- Config ini untuk internal app (timezone, tax rate default, token expiry, dll)
-- Tenant config punya behavior yang beda: butuh inheritance/fallback ke system default
-- Campur di satu tabel bikin query ribet dan rawan bugs
-
-**Plan:**
-
-| Layer | Tabel | Scope | Kapan |
-|-------|-------|-------|-------|
-| System config | `configs` | Global, semua tenant sama | ✅ Phase 1 |
-| Tenant config | `tenant_configs` (tenant_id, group, key, value, type) | Per-tenant, override system | Phase 3 |
-
-**Resolution flow (Phase 3 nanti):**
-```
-Request config value
-→ Cek tenant_configs (specific tenant override)
-→ Kalau nggak ada, fallback ke configs (system default)
-→ Kalau nggak ada juga, return default value dari code
-```
-
-**Rule:** Jangan tambahin tenant_id ke tabel `configs`. Kalau butuh per-tenant config, bikin tabel dan mekanisme terpisah.
 
 ---
 
 ## Adding a New Module
 
-1. Create folder structure under `src/{ModuleName}/`
-2. Create `{ModuleName}ServiceProvider` in `Infrastructure/Providers/`
-3. Register provider in `app/Providers/ModuleServiceProvider.php`
-4. If other modules need data from this module:
-   - Define Gateway interface in `src/Shared/Contracts/{ModuleName}/`
-   - Implement in `src/{ModuleName}/Infrastructure/Gateway/`
-   - Bind in ServiceProvider
-5. Create migrations in `Infrastructure/Database/Migrations/`
-6. Run `composer dump-autoload` and `php artisan migrate`
+1. Determine layer (Foundation / Engine / Building Block / Business)
+2. Create folder structure under `src/{ModuleName}/`
+3. Create `{ModuleName}ServiceProvider` in `Infrastructure/Providers/`
+4. Register provider in `app/Providers/ModuleServiceProvider.php`
+5. If cross-module access needed: define interface in `src/Shared/Contracts/{ModuleName}/`
+6. Create migrations in `Infrastructure/Database/Migrations/`
+7. Run `composer dump-autoload` and `php artisan migrate`
+8. Update this file (KNOWLEDGE.md) with module documentation
 
-**Coding rules & conventions:** See `.kiro/steering/coding-rules.md` — auto-applied on every interaction.
+**Coding rules & conventions:** See `.kiro/steering/coding-rules.md`
 
 ---
 
@@ -570,36 +387,45 @@ Request config value
 |------|----------|--------|
 | 2026-07-12 | Namespace `Purdia\` | Brand identity |
 | 2026-07-12 | API-only, no frontend | Decoupled, consumed by separate FE |
+| 2026-07-12 | Composable Business Platform positioning | Bukan ERP biasa. Building blocks yang di-compose. |
+| 2026-07-12 | 4-layer architecture (Foundation → Engine → Block → Module) | Strict dependency direction. No circular. |
+| 2026-07-12 | Engine pattern (domain logic core) | Business module tipis. Delegate ke engine. |
 | 2026-07-12 | Plain readonly DTO | No dependencies, native PHP |
-| 2026-07-12 | Sync events by default | Simple debugging, queue opt-in |
-| 2026-07-12 | Gateway pattern for cross-module | Clear "entry point" semantics, no clash with Laravel Facade |
-| 2026-07-12 | Interface on boundaries only | Repository, Gateway, External services. Actions stay concrete |
-| 2026-07-12 | No DB enum type | PHP enum + string column. Avoid migration headaches |
+| 2026-07-12 | Sync events by default, queue opt-in + Saga | Jangan async tanpa compensation handler |
+| 2026-07-12 | Gateway pattern for cross-module | Clear "entry point" semantics |
+| 2026-07-12 | Interface on boundaries only | Repository, Gateway, Engine. Actions stay concrete. |
+| 2026-07-12 | No DB enum type | PHP enum + string column |
 | 2026-07-12 | Sanctum for auth | Laravel native, simple, revocable tokens |
-| 2026-07-12 | Authorization as separate module | Auth ≠ Authorization. Different bounded contexts |
-| 2026-07-12 | Se-native mungkin dengan Laravel | Upgrade-friendly, DDD di struktur bukan melawan framework |
-| 2026-07-12 | Config module with DB storage | Avoid code changes for config. Grouped by module, dot-notation keys, typed values |
-| 2026-07-12 | Global config group = "general" | Shared/non-module configs pakai group "general" |
-| 2026-07-12 | Sync events dulu, async nanti + Saga | Jangan async tanpa compensation handler. Outbox pattern dipertimbangkan |
-| 2026-07-12 | Permission enforce di backend WAJIB | Frontend permission cuma UX, backend harus enforce scope action/api |
-| 2026-07-12 | tenant_id di semua tabel bisnis Phase 2 | Preparation multi-tenancy. Default 1 dulu, Phase 3 baru activate |
-| 2026-07-12 | Config table tanpa tenant_id | System-level config. Tenant config nanti tabel terpisah (tenant_configs) dengan fallback mechanism |
-| 2026-07-12 | Reference module untuk master data | Countries, currencies — seeded, read-only. Foundation buat module bisnis (POS, Inventory) |
-| 2026-07-12 | Generic lookup system | Data simple (gender, religion, dll) pake lookup_types + lookup_items. Extensible tanpa code change |
-| 2026-07-12 | Unified /api/lookups endpoint | Single request buat multiple reference data. Hemat API call buat form filling |
-| 2026-07-12 | Storage module — metadata only di DB | File fisik di filesystem (disk), DB cuma simpan metadata + access control |
-| 2026-07-12 | Storage rules buat auto-routing | File otomatis masuk disk/path yang tepat berdasarkan mime type atau extension |
-| 2026-07-12 | File access control: public/private/restricted | Restricted pake access list per user/role dengan level read_only/read_write/full_control |
-| 2026-07-12 | Tenant = Perusahaan, Branch = Cabang/Toko | 1 tenant = 1 bisnis. Cabang/toko/gudang = branch di dalam tenant |
-| 2026-07-12 | No owner_id di tenant | Owner = role di tenant_users. Lebih flexible kalau ownership berubah |
-| 2026-07-12 | User-Tenant many-to-many | User bisa handle banyak perusahaan (owner multi-bisnis, akuntan, dll) |
-| 2026-07-12 | Branch access via separate pivot | branch_users terpisah dari tenant_users. 1 user bisa akses banyak branch tanpa duplicate role |
-| 2026-07-12 | TenantContext sebagai single source of truth | Module lain cuma akses lewat TenantContextInterface, nggak import Tenant module langsung |
-| 2026-07-12 | Resolver chain (Header → Subdomain → JWT) | Extensible, nggak locked ke 1 mechanism |
-| 2026-07-12 | Settings inheritance: Branch → Tenant → System | Fallback chain buat flexibility tanpa duplikasi |
-| 2026-07-12 | HasAudit trait (created_by, updated_by, deleted_by) | Auto via model events. Developer nggak perlu mikir |
-| 2026-07-12 | BelongsToTenant trait (auto scope + auto set) | Global scope otomatis. Semua query tenant-safe |
-| 2026-07-12 | Branch type enum + code unique per tenant | Support store/warehouse/office/factory/virtual. Code buat invoice numbering |
-| 2026-07-12 | parent_branch_id untuk hierarchy | Murah, optional, ready kalau butuh regional grouping |
-| 2026-07-12 | Soft delete semua entity bisnis | ERP jarang benar-benar delete data |
-| 2026-07-12 | UI: "Company" bukan "Tenant" | User-friendly. Code tetap pake Tenant |
+| 2026-07-12 | Authorization as separate module | Auth ≠ Authorization |
+| 2026-07-12 | Se-native mungkin dengan Laravel | DDD di struktur, bukan melawan framework |
+| 2026-07-12 | Tenant = Perusahaan, Branch = Cabang | 1 tenant = 1 bisnis. Toko/gudang = branch. |
+| 2026-07-12 | No owner_id di tenant | Owner = role. Flexible kalau ownership berubah. |
+| 2026-07-12 | User-Tenant many-to-many | User bisa handle banyak company |
+| 2026-07-12 | Branch access via separate pivot | Flexible multi-branch tanpa duplicate role |
+| 2026-07-12 | TenantContext as single source of truth | Module lain cuma akses via contract |
+| 2026-07-12 | Resolver chain (Header → Subdomain → JWT) | Extensible, not locked |
+| 2026-07-12 | Settings inheritance: Branch → Tenant → System | Fallback chain |
+| 2026-07-12 | HasAudit trait (created_by, updated_by, deleted_by) | Auto via model events |
+| 2026-07-12 | BelongsToTenant trait (auto scope + set) | All queries tenant-safe |
+| 2026-07-12 | Soft delete semua entity bisnis | ERP never really deletes |
+| 2026-07-12 | Party = all actors (person/org). Business role = label. | Customer, Supplier, Employee = Party with role |
+| 2026-07-12 | Party split: parties + persons + organizations | Avoid table monster. Class table inheritance. |
+| 2026-07-12 | Catalog nggak tau file | Image via Storage → Attachment (polymorphic) |
+| 2026-07-12 | Tax eventually separate from Pricing | Complex enough for own domain |
+| 2026-07-12 | Document = Sequence + Lifecycle + Revision | Bukan cuma numbering |
+| 2026-07-12 | Workflow = generic state machine | Transition → Condition → Action. Not just approval. |
+| 2026-07-12 | Inventory = Movement only | Nggak peduli sumber. +/- aja. |
+| 2026-07-12 | Stock ≠ Available. Reservation layer. | Available = Stock - Reserved |
+| 2026-07-12 | Activity = event-driven, bukan manual create | Subscribe domain events |
+| 2026-07-12 | Notification = channel-based + template | Pluggable channels |
+| 2026-07-12 | Dimension = generic analytic entity | Cost center, dept, project — satu konsep lintas modul |
+| 2026-07-12 | Classification (bukan Tag) | Tag + Label + Custom Field |
+| 2026-07-12 | Build order: Document → Party → Catalog → Pricing → Tax → Inventory → Workflow | Foundation capabilities first |
+| 2026-07-12 | Config table tanpa tenant_id | System-level. Tenant config = separate table nanti. |
+| 2026-07-12 | Generic lookup system | lookup_types + lookup_items. Extensible tanpa code. |
+| 2026-07-12 | Unified /api/lookups endpoint | Single request buat multiple reference data |
+| 2026-07-12 | Storage rules buat auto-routing | File ke disk/path berdasarkan mime/extension |
+| 2026-07-12 | File access: public/private/restricted | Per user/role, level: read_only/read_write/full_control |
+| 2026-07-12 | Branch type enum + code + hierarchy | store/warehouse/office/factory/virtual. parent_branch_id. |
+| 2026-07-12 | Permission enforce backend WAJIB | Frontend permission cuma UX |
+| 2026-07-12 | UI: "Company" bukan "Tenant" | User-friendly naming |
