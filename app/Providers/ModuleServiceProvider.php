@@ -21,6 +21,7 @@ class ModuleServiceProvider extends ServiceProvider
         \Purdia\Document\Infrastructure\Providers\DocumentServiceProvider::class,
         \Purdia\Party\Infrastructure\Providers\PartyServiceProvider::class,
         \Purdia\Catalog\Infrastructure\Providers\CatalogServiceProvider::class,
+        \Purdia\Pricing\Infrastructure\Providers\PricingServiceProvider::class,
     ];
 
     public function register(): void
