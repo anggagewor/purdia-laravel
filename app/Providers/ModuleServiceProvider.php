@@ -18,6 +18,7 @@ class ModuleServiceProvider extends ServiceProvider
         \Purdia\Reference\Infrastructure\Providers\ReferenceServiceProvider::class,
         \Purdia\Storage\Infrastructure\Providers\StorageServiceProvider::class,
         \Purdia\Tenant\Infrastructure\Providers\TenantServiceProvider::class,
+        \Purdia\Document\Infrastructure\Providers\DocumentServiceProvider::class,
     ];
 
     public function register(): void
